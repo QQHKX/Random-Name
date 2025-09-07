@@ -138,7 +138,7 @@ export const useAppStore = create<AppState>()(
         className: 'CLASS A',
         noRepeat: true,
         speed: 'normal',
-        bgmVolume: 0.2,
+        bgmVolume: 0.0,  // 默认关闭背景音乐
         sfxVolume: 0.6,
       },
       history: [],

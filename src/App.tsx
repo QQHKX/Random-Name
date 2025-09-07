@@ -6,8 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { sfx } from './lib/audioManager'
 import Roulette from './components/Roulette'
 import type { Rarity, Student } from './store/appStore'
-import { drawRarity as configDrawRarity, getWearLevelInfo, type WearLevel } from './config/rarityConfig'
-import * as XLSX from 'xlsx'
+import { drawRarity as configDrawRarity, getWearLevelInfo } from './config/rarityConfig'
 
 /**
  * 计算已抽取学生列表（用于不重复模式）
@@ -29,12 +28,10 @@ function App() {
     settings,
     roster,
     pool,
-    importFromText,
     drawNext,
     lastResult,
     selectedStudent,
     resetPool,
-    replaceRosterFromText,
   } = useAppStore()
 
   // 移除仅用于重新读取 CSV 的选择器，逻辑迁移至设置面板
@@ -46,8 +43,11 @@ function App() {
   const [opening, setOpening] = useState(false)
   const [rollItems, setRollItems] = useState<{ id: string; name: string; rarity: Rarity }[] | null>(null)
   const [targetIndex, setTargetIndex] = useState(0)
+  // 控制轮播动画开始时机
+  const [startAnimation, setStartAnimation] = useState(false)
   // 揭晓后居中放大展示开关
   const [revealOpen, setRevealOpen] = useState(false)
+  const [audioStatus, setAudioStatus] = useState(() => sfx.getCacheStatus())
 
   // 音量与设置联动（SFX + BGM）
   useEffect(() => {
@@ -55,12 +55,52 @@ function App() {
     sfx.setBgmVolume(settings.bgmVolume)
   }, [settings.sfxVolume, settings.bgmVolume])
 
+  // 应用启动时自动预加载音频（静默预加载，不播放）
+  useEffect(() => {
+    const preloadAudio = async () => {
+      try {
+        // 静默预加载所有音频文件，不需要用户交互
+        await sfx.preloadAllAudio((progress) => {
+          // 更新音频状态到界面
+          setAudioStatus(sfx.getCacheStatus())
+          console.log(`音频预加载进度: ${Math.round(progress * 100)}%`)
+        })
+        // 最终更新状态
+        setAudioStatus(sfx.getCacheStatus())
+        console.log('音频预加载完成')
+      } catch (error) {
+        console.warn('音频预加载失败:', error)
+        setAudioStatus(sfx.getCacheStatus())
+      }
+    }
+    preloadAudio()
+    
+    // 定期更新音频状态（兜底机制）
+    const statusInterval = setInterval(() => {
+      setAudioStatus(sfx.getCacheStatus())
+    }, 1000)
+    
+    return () => clearInterval(statusInterval)
+  }, [])
+
+  // 音频就绪状态自动消失
+  const [showAudioStatus, setShowAudioStatus] = useState(true)
+  useEffect(() => {
+    if (audioStatus.loaded) {
+      // 音频加载完成后3秒自动隐藏状态指示器
+      const timer = setTimeout(() => {
+        setShowAudioStatus(false)
+      }, 3000)
+      return () => clearTimeout(timer)
+    }
+  }, [audioStatus.loaded])
+
   // 首次交互时解锁音频并淡入 BGM（只需在一次点击后触发）
   useEffect(() => {
     const onFirstUserGesture = async () => {
       window.removeEventListener('pointerdown', onFirstUserGesture)
       try {
-        await sfx.unlock()
+        await sfx.unlockAudio()
         sfx.playBgm()
         sfx.fadeBgmTo(settings.bgmVolume, 600)
       } catch {}
@@ -71,7 +111,9 @@ function App() {
 
   /**
    * 触发一次抽取流程
+   * - 检查音频是否就绪
    * - 播放点击音效
+   * - 播放开锁音效并等待完成
    * - 调用 drawNext 更新全局状态（lastResult、selectedStudent 等）
    * - 使用全局状态中的 selectedStudent 构建滚动序列
    * - 动画联动：滚动开始时轻压 BGM，揭晓后恢复
@@ -82,27 +124,49 @@ function App() {
       return
     }
 
+    // 检查音频缓存状态
+    if (!audioStatus.loaded && audioStatus.progress < 100) {
+      // 如果音频还在加载中，给用户提示
+      const shouldContinue = confirm(
+        `音频文件还在加载中（${audioStatus.progress}%），现在抽奖可能没有音效。\n\n是否继续抽奖？`
+      )
+      if (!shouldContinue) {
+        return
+      }
+    }
+
     // 点击音效
     sfx.click()
 
-    // 滚动阶段：稍微降低 BGM（避免与滴答冲突）
-    sfx.fadeBgmTo(Math.max(0, settings.bgmVolume * 0.6), 300)
-
-    setOpening(true)
+    setStartAnimation(false) // 重置动画状态
 
     // 先计算结果，但暂不展示，拿到结果后构建滚动序列
     const result = drawNext()
     if (!result) {
-      setOpening(false)
-      // 恢复 BGM 音量
-      sfx.fadeBgmTo(settings.bgmVolume, 300)
       return
     }
 
     // 使用 store 中的 selectedStudent（drawNext 已设置）
     const student = useAppStore.getState().selectedStudent
     const finalName = student?.name || 'Unknown'
+    
+    // 先构建序列但不开始动画
     buildSequence(finalName, result.rarity)
+
+    // 播放开锁音效并等待完成
+    try {
+      await sfx.unlock()
+    } catch (e) {
+      console.warn('开锁音效播放失败:', e)
+    }
+
+    // 开锁音效完成后，显示轮盘并开始滚动动画
+    setOpening(true)
+    // 滚动阶段：稍微降低 BGM（避免与滴答冲突）
+    sfx.fadeBgmTo(Math.max(0, settings.bgmVolume * 0.6), 300)
+    
+    // 启动轮播动画
+    setStartAnimation(true)
   }
 
 
@@ -186,7 +250,27 @@ function App() {
         <div className="mb-6 text-sm text-white/80">
           <span className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 mr-2">班级：{settings.className}</span>
           <span className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 mr-2">名单：{roster.length} 人</span>
-          <span className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10">抽取池：{poolCount} 人</span>
+          <span className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 mr-2">抽取池：{poolCount} 人</span>
+          
+          {/* 音频状态指示器 - 就绪后自动消失 */}
+          {showAudioStatus && (
+            audioStatus.loaded ? (
+              <span className="inline-block px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 transition-opacity duration-500">
+                <span className="inline-block w-2 h-2 bg-green-400 rounded-full mr-1.5"></span>
+                音频就绪
+              </span>
+            ) : audioStatus.progress > 0 ? (
+              <span className="inline-block px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400">
+                <span className="inline-block w-2 h-2 bg-blue-400 rounded-full mr-1.5 animate-pulse"></span>
+                音频加载中 {Math.round(audioStatus.progress)}%
+              </span>
+            ) : (
+              <span className="inline-block px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-400">
+                <span className="inline-block w-2 h-2 bg-yellow-400 rounded-full mr-1.5"></span>
+                音频待加载
+              </span>
+            )
+          )}
         </div>
 
         {/* 轮盘滚动区域 */}
@@ -197,6 +281,7 @@ function App() {
                 items={rollItems}
                 targetIndex={targetIndex}
                 speed={settings.speed}
+                startAnimation={startAnimation}
                 onComplete={() => {
                   // 揭晓音效
                   const r = useAppStore.getState().lastResult
@@ -209,6 +294,8 @@ function App() {
                   // 开启"居中放大"结果展示，改为点击关闭（无限展示）
                   setRevealOpen(true)
                   // 删除自动关闭逻辑
+                  // 重置动画状态
+                  setStartAnimation(false)
                 }}
               />
             )}

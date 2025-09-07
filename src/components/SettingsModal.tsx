@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react'
 import { useAppStore } from '../store/appStore'
 import type { Speed } from '../store/appStore'
 import * as XLSX from 'xlsx'
+import { sfx } from '../lib/audioManager'
 
 export interface SettingsModalProps {
   /** 是否显示弹窗 */
@@ -29,6 +30,10 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
   // 手动导入相关状态
   const [showManualImport, setShowManualImport] = useState(false)
   const [manualText, setManualText] = useState('')
+  
+  // 音频缓存相关状态
+  const [cacheStatus, setCacheStatus] = useState({ loaded: false, progress: 0 })
+  const [isCaching, setIsCaching] = useState(false)
 
   // 弹窗开启时，同步最新设置到本地表单
   useEffect(() => {
@@ -38,6 +43,8 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
       setSpeedLocal(settings.speed)
       setVolumeLocal(settings.sfxVolume)
       setBgmVolumeLocal(settings.bgmVolume)
+      // 更新缓存状态
+      setCacheStatus(sfx.getCacheStatus())
     }
   }, [open, settings])
 
@@ -263,6 +270,55 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
     }
   }
 
+  /**
+   * 一键缓存所有音频文件
+   * - 预加载BGM和所有SFX音效到内存
+   * - 显示加载进度
+   * - 永不过期，直到页面刷新或手动清除
+   */
+  const handleCacheAllAudio = async () => {
+    if (isCaching) return
+    
+    setIsCaching(true)
+    setCacheStatus({ loaded: false, progress: 0 })
+    
+    try {
+      // 先解锁音频环境
+      await sfx.unlockAudio()
+      
+      // 开始预加载
+      const success = await sfx.preloadAllAudio((progress) => {
+        setCacheStatus({ loaded: false, progress })
+      })
+      
+      if (success) {
+        setCacheStatus({ loaded: true, progress: 100 })
+        alert('🎵 所有音频文件已成功缓存到内存！\n\n缓存将保持到页面刷新，避免重复加载。')
+      } else {
+        alert('⚠️ 部分音频文件缓存失败，请检查网络连接或音频文件是否存在。')
+      }
+    } catch (error) {
+      console.error('音频缓存失败：', error)
+      alert('❌ 音频缓存失败，请查看控制台了解详情。')
+    } finally {
+      setIsCaching(false)
+    }
+  }
+
+  /**
+   * 清除音频缓存
+   * - 释放内存中的所有音频文件
+   * - 重置缓存状态
+   */
+  const handleClearCache = () => {
+    const ok = confirm('确定要清除所有音频缓存吗？\n\n清除后需要重新缓存才能避免重复加载。')
+    if (!ok) return
+    
+    sfx.clearAudioCache()
+    setCacheStatus({ loaded: false, progress: 0 })
+    alert('🗑️ 音频缓存已清除')
+  }
+
   if (!open) return null
 
   return (
@@ -429,6 +485,100 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
             </div>
             
             <div className="text-xs opacity-60 mt-2">提示：导入/重载将覆盖当前名单，并自动重置抽取池。支持CSV、XLSX文件或手动输入。</div>
+          </div>
+
+          {/* 音频缓存管理 */}
+          <div className="pt-4 border-t border-white/10">
+            <div className="text-sm font-medium mb-3">音频缓存管理</div>
+            
+            {/* 缓存状态显示 */}
+            <div className="mb-3 p-3 rounded-lg bg-white/5 border border-white/10">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm">缓存状态</span>
+                <span className={`text-xs px-2 py-1 rounded flex items-center gap-1 ${
+                  cacheStatus.loaded 
+                    ? 'bg-green-600/20 text-green-400 border border-green-500/30' 
+                    : isCaching
+                    ? 'bg-blue-600/20 text-blue-400 border border-blue-500/30'
+                    : 'bg-gray-600/20 text-gray-400 border border-gray-500/30'
+                }`}>
+                  {cacheStatus.loaded ? (
+                    <>
+                      <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                      已缓存
+                    </>
+                  ) : isCaching ? (
+                    <>
+                      <span className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></span>
+                      加载中
+                    </>
+                  ) : (
+                    <>
+                      <span className="w-2 h-2 bg-gray-400 rounded-full"></span>
+                      未缓存
+                    </>
+                  )}
+                </span>
+              </div>
+              
+              {/* 进度条 */}
+              {(isCaching || cacheStatus.progress > 0) && (
+                <div className="mb-2">
+                  <div className="flex items-center justify-between text-xs mb-1">
+                    <span>加载进度</span>
+                    <span>{cacheStatus.progress}%</span>
+                  </div>
+                  <div className="w-full bg-white/10 rounded-full h-2">
+                    <div 
+                      className={`h-2 rounded-full transition-all duration-300 ${
+                        cacheStatus.loaded ? 'bg-green-500' : 'bg-[var(--csgo-blue)]'
+                      }`}
+                      style={{ width: `${cacheStatus.progress}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              
+              {/* 预加载提示 */}
+              {isCaching && (
+                <div className="mb-2 text-xs text-blue-400 flex items-center gap-1">
+                  <span className="animate-spin">⟳</span>
+                  正在预加载音频文件，请稍候...
+                </div>
+              )}
+              
+              <div className="text-xs opacity-60">
+                {cacheStatus.loaded 
+                  ? '所有音频文件已缓存到内存，播放时无需重复加载' 
+                  : '音频文件将在首次播放时加载，可能造成延迟'}
+              </div>
+            </div>
+            
+            {/* 缓存操作按钮 */}
+            <div className="flex items-center gap-3 flex-wrap">
+              <button 
+                type="button" 
+                onClick={handleCacheAllAudio}
+                disabled={isCaching || cacheStatus.loaded}
+                className="px-4 py-2 rounded-lg bg-[var(--csgo-blue)] hover:bg-sky-500 border border-sky-300/30 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isCaching ? '缓存中...' : '一键缓存所有音频'}
+              </button>
+              
+              {cacheStatus.loaded && (
+                <button 
+                  type="button" 
+                  onClick={handleClearCache}
+                  className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 border border-red-300/30 text-sm font-medium transition-colors"
+                >
+                  清除缓存
+                </button>
+              )}
+            </div>
+            
+            <div className="text-xs opacity-60 mt-2">
+              提示：缓存将保持到页面刷新，建议在使用前先缓存以获得最佳体验。包含BGM和所有音效文件。
+            </div>
           </div>
 
             </form>

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { motion, useAnimation } from 'framer-motion'
 import type { Rarity } from '../store/appStore'
 import { sfx } from '../lib/audioManager'
@@ -22,6 +22,8 @@ export interface RouletteProps {
   targetIndex: number
   /** 动画速度 */
   speed: 'slow' | 'normal' | 'fast'
+  /** 是否开始动画 */
+  startAnimation: boolean
   /** 动画完成回调（减速停止并高亮后触发） */
   onComplete?: () => void
 }
@@ -52,10 +54,10 @@ function rarityBg(r: Rarity) {
 
 /** 根据速度返回总时长（秒） */
 function speedDuration(speed: RouletteProps['speed']) {
-  // 延长抽奖时间，尤其是slow模式，让体验更有悬念感
-  if (speed === 'fast') return 3.5  // 从2.0延长到3.5秒
-  if (speed === 'slow') return 7.0   // 从4.2延长到7.0秒
-  return 5.2  // 从3.1延长到5.2秒
+  // 调整速度档位：快速→标准，标准→缓慢，缓慢再降一档
+  if (speed === 'fast') return 5.2   // 原标准速度
+  if (speed === 'slow') return 9.0   // 比原缓慢更慢
+  return 7.0  // 原缓慢速度
 }
 
 /**
@@ -68,7 +70,7 @@ function xToIndex(x: number, centerOffset: number) {
   return Math.round((centerOffset - x) / STEP)
 }
 
-export default function Roulette({ items, targetIndex, speed, onComplete }: RouletteProps) {
+export default function Roulette({ items, targetIndex, speed, startAnimation, onComplete }: RouletteProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const [centerOffset, setCenterOffset] = useState(0)
   const [stopped, setStopped] = useState(false)
@@ -139,7 +141,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
 
   // 速度映射到滴答频率与动画总时长
   const duration = speedDuration(speed)
-  const baseTickFreq = speed === 'fast' ? 1100 : speed === 'slow' ? 880 : 980
+  const baseTickFreq = speed === 'fast' ? 980 : speed === 'slow' ? 800 : 880
 
   /**
    * 计算展示用的 items：在不改变目标索引的前提下，左侧预补齐 prepad，右侧按需补齐，
@@ -189,6 +191,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
   useEffect(() => {
     if (!wrapRef.current) return
     if (!items || items.length === 0) return
+    if (!startAnimation) return
 
     setStopped(false)
 
@@ -215,7 +218,6 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
     const localFinalX = centerOffset - (targetDisplayIndex * STEP)
 
     const x0 = centerOffset
-    const x1 = x0 - STEP * 6
     const x3 = localFinalX
 
     // 记录总距离用于 onUpdate 计算音量强度
@@ -227,8 +229,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
     // 先设置起始位置
     controls.set({ x: x0 })
 
-    // 播放一次开场提示（可选）：轻微滴答，营造开动的感觉
-    try { sfx.tick(0.9, baseTickFreq) } catch {}
+    // 开场提示音效已移至App.tsx中的开锁音效，此处不再播放
 
     requestAnimationFrame(() => {
       controls.start({
@@ -236,7 +237,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
         transition: { duration, ease: CSGO_EASE },
       })
     })
-  }, [items, targetIndex, centerOffset, duration, controls])
+  }, [items, targetIndex, centerOffset, duration, controls, startAnimation])
 
   // onUpdate 里做滴答触发：当“经过的卡片索引”变化时播放一次
   const handleUpdate = (latest: any) => {
