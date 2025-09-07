@@ -221,7 +221,7 @@ function App() {
   return (
     <div className="min-h-screen w-full bg-[var(--csgo-bg)] text-white flex items-center justify-center">
       {/* 左侧：已抽取名单（仅在不重复模式显示，且大屏显示，动画结束后才显示避免透露结果） */}
-      {settings.noRepeat && drawnStudents.length > 0 && !opening && (
+      {settings.noRepeat && drawnStudents.length > 0 && !opening && !rollItems && (
         <div className="hidden lg:block fixed left-4 top-1/2 -translate-y-1/2 z-30 w-48 max-h-[80vh] overflow-y-auto">
           <div className="p-3 rounded-xl border border-white/10 bg-[var(--csgo-panel)]/70 backdrop-blur-sm shadow-[0_0_24px_rgba(0,162,255,0.12)]">
             <div className="mb-2 text-sm font-semibold opacity-90">已抽取（{drawnStudents.length}/{roster.length}）</div>
