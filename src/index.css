@@ -1,0 +1,128 @@
+/* Tailwind v4 entry */
+@import "tailwindcss";
+
+/* CSGO 主题基础变量 */
+:root {
+  --csgo-bg: #1A1A1A;
+  --csgo-panel: #2C2C2C;
+  --csgo-blue: #00A2FF;
+  --csgo-orange: #FF9900;
+  --rarity-blue: #4B69FF;
+  --rarity-purple: #8847FF;
+  --rarity-pink: #D32CE6;
+  --rarity-red: #EB4B4B;
+  --rarity-gold: #FFD700;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  @apply bg-[var(--csgo-bg)] text-white antialiased;
+  overflow: hidden;
+}
+
+/* 隐藏滚动条 */
+::-webkit-scrollbar {
+  display: none;
+}
+
+html {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+body {
+  -ms-overflow-style: none;
+  /* IE and Edge */
+  scrollbar-width: none;
+  /* Firefox */
+}
+
+a {
+  font-weight: 500;
+  color: #646cff;
+  text-decoration: inherit;
+}
+
+a:hover {
+  color: #535bf2;
+}
+
+body {
+  margin: 0;
+  display: flex;
+  place-items: center;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+h1 {
+  font-size: 3.2em;
+  line-height: 1.1;
+}
+
+button {
+  border-radius: 8px;
+  border: 1px solid transparent;
+  padding: 0.6em 1.2em;
+  font-size: 1em;
+  font-weight: 500;
+  font-family: inherit;
+  background-color: #1a1a1a;
+  cursor: pointer;
+  transition: border-color 0.25s;
+}
+
+button:hover {
+  border-color: #646cff;
+}
+
+button:focus,
+button:focus-visible {
+  outline: 4px auto -webkit-focus-ring-color;
+}
+
+@keyframes pulseGlow {
+
+  0%,
+  100% {
+    opacity: 0.55;
+    filter: blur(0px);
+  }
+
+  50% {
+    opacity: 0.95;
+    filter: blur(2px);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+
+  100% {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    color: #213547;
+    background-color: #ffffff;
+  }
+
+  a:hover {
+    color: #747bff;
+  }
+
+  button {
+    background-color: #f9f9f9;
+  }
+}
