@@ -81,7 +81,8 @@
 - 所有组件与导出函数需添加中文 JSDoc：功能说明、参数、返回值，且函数级注释与类型定义必须到位。
 - SettingsModal 必须通过 store 方法进行设置写回：setClassName、toggleNoRepeat、setSpeed、setVolumes。
 - 轮盘动画采用单段 ease-out，目标项停在中心指示器；速度与时长由 settings.speed 驱动。
-- 滚动序列非目标项稀有度：填充项在 UI 侧按 drawRarity 概率随机（blue 60%, purple 20%, pink 12%, red 7%, gold 1%）；目标项使用真实稀有度。
+- 滚动序列非目标项稀有度：填充项在 UI 侧按 drawRarity 概率随机（blue 70%, purple 18%, pink 8%, red 3.5%, gold 0.5%）；目标项使用真实稀有度。
+- 稀有度概率配置：统一在 src/config/rarityConfig.ts 中管理，所有概率相关代码都应使用该配置文件。
 - 音频管理器需提供：unlock、playBgm、pauseBgm、fadeBgmTo、setVolume、setBgmVolume、click、tick、reveal 等方法占位与实现；音量变更与 settings 联动。
 - 不重复模式：toggleNoRepeat(true) 时构建 pool；toggleNoRepeat(false) 时清空 pool；hydrate 后若 noRepeat=true 且 pool 为空则 resetPool。
 - 资源目录：public/audio 放置 bgm 与 sfx；命名遵循小写连字符；SVG 用于矢量图标与占位。

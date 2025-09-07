@@ -1,10 +1,12 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
+import { drawRarity as configDrawRarity, drawWearLevel, generateWearValue, type Rarity, type WearLevel } from '../config/rarityConfig';
 
 /**
  * 稀有度类型（CSGO 风格）
+ * 重新导出以保持向后兼容性
  */
-export type Rarity = 'blue' | 'purple' | 'pink' | 'red' | 'gold';
+export type { Rarity };
 
 /**
  * 动画速度设置
@@ -38,6 +40,8 @@ export interface AppSettings {
 export interface RollResult {
   studentId: string;
   rarity: Rarity;
+  wearLevel: WearLevel;
+  wearValue: number;
   timestamp: number;
 }
 
@@ -92,16 +96,12 @@ function uid(prefix = 'stu'): string {
 }
 
 /**
- * 按默认概率生成稀有度
- * 概率：blue 60%, purple 20%, pink 12%, red 7%, gold 1%
+ * 按配置概率生成稀有度
+ * 使用统一的配置文件管理概率
+ * 概率：blue 70%, purple 18%, pink 8%, red 3.5%, gold 0.5%
  */
 function drawRarity(): Rarity {
-  const r = Math.random();
-  if (r < 0.60) return 'blue';
-  if (r < 0.80) return 'purple';
-  if (r < 0.92) return 'pink';
-  if (r < 0.99) return 'red';
-  return 'gold';
+  return configDrawRarity();
 }
 
 /**
@@ -301,7 +301,9 @@ export const useAppStore = create<AppState>()(
         if (!student) return undefined;
 
         const rarity = drawRarity();
-        const result: RollResult = { studentId, rarity, timestamp: Date.now() };
+        const wearLevel = drawWearLevel();
+        const wearValue = generateWearValue(wearLevel);
+        const result: RollResult = { studentId, rarity, wearLevel, wearValue, timestamp: Date.now() };
 
         set((s) => {
           // 更新池（不重复模式下移除选中者）

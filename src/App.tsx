@@ -6,6 +6,7 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { sfx } from './lib/audioManager'
 import Roulette from './components/Roulette'
 import type { Rarity, Student } from './store/appStore'
+import { drawRarity as configDrawRarity, getWearLevelInfo, type WearLevel } from './config/rarityConfig'
 import * as XLSX from 'xlsx'
 
 /**
@@ -239,13 +240,13 @@ function App() {
             <motion.div
               className="relative"
               initial={{ y: 20, scale: 0.78, opacity: 0 }}
-              animate={{ y: 0, scale: 1.06, opacity: 1 }}
+              animate={{ y: 0, scale: 1.25, opacity: 1 }}
               exit={{ y: -10, scale: 0.92, opacity: 0 }}
               transition={{ type: 'spring', stiffness: 240, damping: 22 }}
               onClick={(e) => { e.stopPropagation(); setRevealOpen(false) }}
             >
               <div
-                className="w-[360px] max-w-[92vw] h-[160px] rounded-2xl border border-white/12 box-border flex items-center justify-start gap-4 px-6 relative shadow-[0_0_40px_rgba(0,0,0,0.35)]"
+                className="w-[420px] max-w-[92vw] h-[200px] rounded-2xl border border-white/12 box-border flex items-center justify-start gap-6 px-8 py-4 relative shadow-[0_0_40px_rgba(0,0,0,0.35)]"
                 style={{
                   background: rarityBg(lastResult.rarity),
                 }}
@@ -272,12 +273,23 @@ function App() {
                   />
                 )}
 
-                <div className="w-16 h-16 rounded-full bg-white/10 flex items-center justify-center text-xl font-semibold">
+                <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center text-2xl font-bold text-white/90 flex-shrink-0">
                   {selectedStudent.name.charAt(0).toUpperCase()}
                 </div>
-                <div className="text-left">
-                  <div className="text-2xl font-bold tracking-wide">{selectedStudent.name}</div>
-                  <div className="text-xs opacity-80">稀有度：{rarityLabelCN(lastResult.rarity)}</div>
+                <div className="text-left flex-1 flex flex-col justify-center">
+                  <div className="text-3xl font-bold tracking-wide mb-1">{selectedStudent.name}</div>
+                  <div className="text-sm opacity-90 mb-2">稀有度：{rarityLabelCN(lastResult.rarity)}</div>
+                  <div className="text-[10px] text-white/60 whitespace-nowrap truncate">
+                    磨损：
+                    <span
+                      className="font-medium ml-1 opacity-80"
+                      style={{ color: getWearLevelInfo(lastResult.wearLevel).color }}
+                    >
+                      {getWearLevelInfo(lastResult.wearLevel).label}
+                    </span>
+                    <span className="mx-1">·</span>
+                    磨损值：{lastResult.wearValue.toFixed(4)}
+                  </div>
                 </div>
               </div>
 
@@ -314,16 +326,12 @@ export default App
 
 /**
  * 生成随机稀有度（与 store 内部 drawRarity 概率一致）
- * 概率：blue 60%, purple 20%, pink 12%, red 7%, gold 1%
+ * 使用统一的配置文件管理概率
+ * 概率：blue 70%, purple 18%, pink 8%, red 3.5%, gold 0.5%
  * @returns {Rarity} 随机稀有度
  */
 function rollRarity(): Rarity {
-  const r = Math.random()
-  if (r < 0.60) return 'blue'
-  if (r < 0.80) return 'purple'
-  if (r < 0.92) return 'pink'
-  if (r < 0.99) return 'red'
-  return 'gold'
+  return configDrawRarity();
 }
 
 /**
@@ -334,16 +342,17 @@ function rollRarity(): Rarity {
 function rarityBg(r: Rarity) {
   switch (r) {
     case 'gold':
-      return 'linear-gradient(135deg, rgba(255,215,0,0.22), rgba(255,153,0,0.10))'
+      // 提高不透明度，使卡片更清晰
+      return 'linear-gradient(135deg, rgba(255,215,0,0.38), rgba(255,153,0,0.20))'
     case 'red':
-      return 'linear-gradient(135deg, rgba(235,75,75,0.22), rgba(255,153,153,0.08))'
+      return 'linear-gradient(135deg, rgba(235,75,75,0.34), rgba(255,153,153,0.16))'
     case 'pink':
-      return 'linear-gradient(135deg, rgba(211,44,230,0.20), rgba(211,44,230,0.08))'
+      return 'linear-gradient(135deg, rgba(211,44,230,0.30), rgba(211,44,230,0.14))'
     case 'purple':
-      return 'linear-gradient(135deg, rgba(136,71,255,0.20), rgba(136,71,255,0.08))'
+      return 'linear-gradient(135deg, rgba(136,71,255,0.28), rgba(136,71,255,0.12))'
     case 'blue':
     default:
-      return 'linear-gradient(135deg, rgba(75,105,255,0.18), rgba(75,105,255,0.08))'
+      return 'linear-gradient(135deg, rgba(75,105,255,0.24), rgba(75,105,255,0.12))'
   }
 }
 
