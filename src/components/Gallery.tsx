@@ -1,8 +1,8 @@
-import { useMemo, useState, useRef, forwardRef } from 'react'
+import { useMemo, useState, forwardRef } from 'react'
 import { useAppStore } from '../store/appStore'
 import { rarityBg, rarityLabelCN } from './ResultCard'
 import { getWearLevelInfo, drawWearLevel } from '../config/rarityConfig'
-import type { Rarity, Student } from '../store/appStore'
+import type { Rarity } from '../store/appStore'
 import type { WearLevel } from '../config/rarityConfig'
 
 /**

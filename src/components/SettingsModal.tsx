@@ -19,7 +19,7 @@ export interface SettingsModalProps {
  * - 表单受控，提交时写回 store
  */
 export default function SettingsModal({ open, onClose }: SettingsModalProps) {
-  const { settings, setClassName, toggleNoRepeat, setSpeed, setVolumes, importFromText, resetPool, roster } = useAppStore()
+  const { settings, setClassName, toggleNoRepeat, setSpeed, setVolumes, resetPool, roster } = useAppStore()
   const replaceRosterFromText = useAppStore((s) => s.replaceRosterFromText)
   const clearHistory = useAppStore((s) => s.clearHistory)
   const historyCount = useAppStore((s) => s.history.length)

@@ -1,4 +1,3 @@
-import React from 'react'
 import { RARITY_PROBABILITIES, WEAR_PROBABILITIES, getRarityPercentage, getRarityProbability } from '../config/rarityConfig'
 import type { Rarity, WearLevel } from '../config/rarityConfig'
 
