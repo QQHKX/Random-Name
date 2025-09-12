@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { motion } from 'framer-motion'
 import './App.css'
 import { useAppStore } from './store/appStore'
 import SettingsModal from './components/SettingsModal'
@@ -273,14 +274,24 @@ function App() {
           <div className="relative z-10 min-h-screen grid grid-cols-12 gap-6">
             
             {/* 左侧边栏：已抽取名单 */}
-            <div className="col-span-12 lg:col-span-3 xl:col-span-2 order-3 lg:order-1 p-3 lg:pl-3 lg:pr-2">
+            <motion.div 
+              className="col-span-12 lg:col-span-3 xl:col-span-2 order-3 lg:order-1 p-3 lg:pl-3 lg:pr-2"
+              initial={{ opacity: 0, x: -50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.2, ease: "easeOut" }}
+            >
               <DrawnStudentsSidebar 
                 visible={settings.noRepeat && drawnStudents.length > 0 && currentPage === 'home'}
               />
-            </div>
+            </motion.div>
 
             {/* 主内容区域 */}
-            <div className="col-span-12 lg:col-span-6 xl:col-span-8 order-1 lg:order-2 p-6 lg:px-3">
+            <motion.div 
+              className="col-span-12 lg:col-span-6 xl:col-span-8 order-1 lg:order-2 p-6 lg:px-3"
+              initial={{ opacity: 0, y: 30 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.8, delay: 0.1, ease: "easeOut" }}
+            >
               <div className="flex flex-col items-center justify-center min-h-[calc(100vh-3rem)] px-2 lg:px-0">
                 
                 {/* 顶部标题区域 */}
@@ -320,10 +331,15 @@ function App() {
                    </div>
                  </div>
               </div>
-            </div>
+            </motion.div>
 
             {/* 右侧边栏：设置和快捷操作 */}
-            <div className="col-span-12 lg:col-span-3 xl:col-span-2 order-2 lg:order-3 p-6 lg:pl-3 lg:pr-6">
+            <motion.div 
+              className="col-span-12 lg:col-span-3 xl:col-span-2 order-2 lg:order-3 p-6 lg:pl-3 lg:pr-6"
+              initial={{ opacity: 0, x: 50 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ duration: 0.6, delay: 0.3, ease: "easeOut" }}
+            >
               <div className="sticky top-6 space-y-4 lg:space-y-6">
                 
                 {/* 系统状态 */}
@@ -336,13 +352,19 @@ function App() {
                   resetDisabled={roster.length === 0}
                 />
               </div>
-            </div>
+            </motion.div>
           </div>
 
           {/* 收藏馆（历史记录）- 移至底部 */}
-          <div ref={galleryRef} className="relative z-10">
+          <motion.div 
+            ref={galleryRef} 
+            className="relative z-10"
+            initial={{ opacity: 0, y: 50 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, delay: 0.5, ease: "easeOut" }}
+          >
             <Gallery />
-          </div>
+          </motion.div>
         </div>
       )}
 
@@ -365,7 +387,15 @@ function App() {
       />
 
       {/* 页脚组件 */}
-      {currentPage === 'home' && <Footer />}
+      {currentPage === 'home' && (
+        <motion.div
+          initial={{ opacity: 0, y: 30 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.6, delay: 0.6, ease: "easeOut" }}
+        >
+          <Footer />
+        </motion.div>
+      )}
 
       {/* 设置面板挂载 */}
       <SettingsModal open={openSettings} onClose={() => setOpenSettings(false)} />

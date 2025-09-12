@@ -1,4 +1,5 @@
 import React from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '../store/appStore'
 import type { Student } from '../store/appStore'
 
@@ -57,25 +58,64 @@ const DrawnStudentsSidebar: React.FC<DrawnStudentsSidebarProps> = ({
   )
 
   return (
-    <div className={`sticky top-3 ${className}`}>
-      <div className="bg-[var(--csgo-panel)]/80 backdrop-blur-xl rounded-2xl border border-white/10 p-3 lg:p-4 shadow-2xl">
-        {/* 标题区域 */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-          <h3 className="text-base lg:text-lg font-semibold text-white">已抽取名单</h3>
-        </div>
-        
-        {/* 进度信息 */}
-        <div className="text-sm text-white/60 mb-4">
-          {drawnStudents.length} / {roster.length} 人
-        </div>
-        
-        {/* 学生列表 */}
-        <div className="max-h-[40vh] lg:max-h-[60vh] overflow-y-auto space-y-0.5">
-          {drawnStudents.map((student, index) => renderStudentItem(student, index))}
-        </div>
-      </div>
-    </div>
+    <AnimatePresence>
+      {visible && drawnStudents.length > 0 && (
+        <motion.div 
+          className={`sticky top-3 ${className}`}
+          initial={{ opacity: 0, x: -30, scale: 0.95 }}
+          animate={{ opacity: 1, x: 0, scale: 1 }}
+          exit={{ opacity: 0, x: -30, scale: 0.95 }}
+          transition={{ duration: 0.4, ease: "easeOut" }}
+        >
+          <motion.div 
+            className="bg-[var(--csgo-panel)]/80 backdrop-blur-xl rounded-2xl border border-white/10 p-3 lg:p-4 shadow-2xl"
+            initial={{ y: 20 }}
+            animate={{ y: 0 }}
+            transition={{ duration: 0.4, delay: 0.1, ease: "easeOut" }}
+          >
+            {/* 标题区域 */}
+            <motion.div 
+              className="flex items-center gap-3 mb-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.2 }}
+            >
+              <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
+              <h3 className="text-base lg:text-lg font-semibold text-white">已抽取名单</h3>
+            </motion.div>
+            
+            {/* 进度信息 */}
+            <motion.div 
+              className="text-sm text-white/60 mb-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.3, delay: 0.3 }}
+            >
+              {drawnStudents.length} / {roster.length} 人
+            </motion.div>
+            
+            {/* 学生列表 */}
+            <motion.div 
+              className="max-h-[40vh] lg:max-h-[60vh] overflow-y-auto space-y-0.5"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ duration: 0.4, delay: 0.4 }}
+            >
+              {drawnStudents.map((student, index) => (
+                <motion.div
+                  key={student.id}
+                  initial={{ opacity: 0, x: -20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ duration: 0.3, delay: 0.5 + index * 0.05 }}
+                >
+                  {renderStudentItem(student, index)}
+                </motion.div>
+              ))}
+            </motion.div>
+          </motion.div>
+        </motion.div>
+      )}
+    </AnimatePresence>
   )
 }
 

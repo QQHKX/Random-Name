@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '../store/appStore'
 import type { Speed } from '../store/appStore'
 import * as XLSX from 'xlsx'
@@ -264,12 +265,25 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
     alert('🗑️ 音频缓存已清除')
   }
 
-  if (!open) return null
-
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
-      <div className="absolute inset-0 bg-black/60" onClick={onClose} />
-      <div className="relative w-[min(560px,95vw)] max-h-[90vh] rounded-xl border border-white/10 bg-[var(--csgo-panel)] shadow-2xl text-white overflow-hidden flex flex-col">
+    <AnimatePresence>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <motion.div 
+            className="absolute inset-0 bg-black/60" 
+            onClick={onClose}
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.3 }}
+          />
+          <motion.div 
+            className="relative w-[min(560px,95vw)] max-h-[90vh] rounded-xl border border-white/10 bg-[var(--csgo-panel)] shadow-2xl text-white overflow-hidden flex flex-col"
+            initial={{ opacity: 0, scale: 0.9, y: 20 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.9, y: 20 }}
+            transition={{ duration: 0.3, ease: "easeOut" }}
+          >
         <div className="flex items-center justify-between p-6 pb-4 flex-shrink-0">
           <h2 className="text-xl font-semibold">设置</h2>
           <button onClick={onClose} className="text-white/70 hover:text-white">✕</button>
@@ -556,7 +570,9 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
             保存设置
           </button>
         </div>
-      </div>
-    </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   )
 }
