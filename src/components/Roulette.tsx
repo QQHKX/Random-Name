@@ -26,8 +26,8 @@ export interface RouletteProps {
   onComplete?: () => void
 }
 
-const TILE_W = 120 // 单卡片宽度
-const TILE_GAP = 8 // 卡片间隙
+const TILE_W = 180 // 单卡片宽度
+const TILE_GAP = 12 // 卡片间隙
 const STEP = TILE_W + TILE_GAP // 每步距离
 
 /** CSGO 风格强减速缓动（越接近终点减速越明显，最后阶段大幅减速） */
@@ -255,7 +255,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
   }
 
   return (
-    <div className="relative w-[min(720px,95vw)] select-none">
+    <div className="relative w-[min(1200px,90vw)] select-none">
       {/* 中心指示器 */}
       <div className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px] bg-cyan-400/70 shadow-[0_0_10px_rgba(34,211,238,0.6)] z-20" />
 
@@ -298,7 +298,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
             return (
                <div
                  key={`${it.id}-${idx}`}
-                 className="w-[120px] h-[72px] rounded-lg border box-border shrink-0 flex-none text-center flex items-center justify-center relative"
+                 className="w-[180px] h-[108px] rounded-lg border box-border shrink-0 flex-none text-center flex items-center justify-center relative text-lg font-medium"
                   style={{
                     background: rarityBg(it.rarity),
                     borderColor: 'rgba(255,255,255,0.10)',
@@ -340,7 +340,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
                   </>
                 )}
 
-                <span className="text-white text-sm font-medium truncate px-2 max-w-[110px]" title={it.name}>
+                <span className="text-white text-xl font-semibold truncate px-3 max-w-[170px]" title={it.name}>
                   {it.name}
                 </span>
               </div>
