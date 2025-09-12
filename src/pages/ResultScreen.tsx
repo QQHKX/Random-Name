@@ -43,6 +43,14 @@ export default function ResultScreen({
           className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md"
           onClick={onClose}
         >
+          {/* 装饰边框 - 带外边距 */}
+          <div className="absolute inset-4 border border-yellow-500/20 rounded-lg pointer-events-none">
+            {/* 四角光效 */}
+            <div className="absolute -top-1 -left-1 w-4 h-4 bg-yellow-400/50 rounded-full blur-sm"></div>
+            <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400/50 rounded-full blur-sm"></div>
+            <div className="absolute -bottom-1 -left-1 w-4 h-4 bg-yellow-400/50 rounded-full blur-sm"></div>
+            <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-yellow-400/50 rounded-full blur-sm"></div>
+          </div>
           {/* 主要内容区域 */}
           <div className="absolute inset-0 flex items-center justify-center p-8">
             {/* 背景装饰效果 */}
@@ -123,14 +131,7 @@ export default function ResultScreen({
                 />
               </motion.div>
 
-              {/* 装饰边框 */}
-              <div className="absolute -inset-26 border border-yellow-500/20 rounded-2xl pointer-events-none">
-                {/* 四角光效 */}
-                <div className="absolute -top-1 -left-1 w-4 h-4 bg-yellow-400/50 rounded-full blur-sm"></div>
-                <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400/50 rounded-full blur-sm"></div>
-                <div className="absolute -bottom-1 -left-1 w-4 h-4 bg-yellow-400/50 rounded-full blur-sm"></div>
-                <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-yellow-400/50 rounded-full blur-sm"></div>
-              </div>
+
             </motion.div>
 
             {/* 操作菜单 - 横跨整个屏幕底部 */}
