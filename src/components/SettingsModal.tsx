@@ -19,7 +19,8 @@ export interface SettingsModalProps {
 export default function SettingsModal({ open, onClose }: SettingsModalProps) {
   const { settings, setClassName, toggleNoRepeat, setSpeed, setVolumes, importFromText, resetPool, roster } = useAppStore()
   const replaceRosterFromText = useAppStore((s) => s.replaceRosterFromText)
-
+  const clearHistory = useAppStore((s) => s.clearHistory)
+  const historyCount = useAppStore((s) => s.history.length)
   // 本地受控状态，避免直接影响全局设置（提交时写回）
   const [className, setClassNameLocal] = useState(settings.className)
   const [noRepeat, setNoRepeatLocal] = useState(settings.noRepeat)
@@ -585,6 +586,28 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
             </form>
         </div>
         
+        {/* 历史记录管理 */}
+        <div className="px-6 pb-2 w-full">
+          <div className="flex items-center justify-between">
+            <div className="text-sm opacity-75">历史记录：{historyCount} 条</div>
+            <button
+              type="button"
+              onClick={() => {
+                sfx.click()
+                if (historyCount === 0) return
+                if (confirm(`确定删除全部 ${historyCount} 条抽奖记录？该操作不可恢复。`)) {
+                  clearHistory()
+                }
+              }}
+              disabled={historyCount === 0}
+              className="px-3 py-2 rounded-md bg-red-600 hover:bg-red-500 border border-red-300/30 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              title="清空抽奖记录"
+            >
+              清空抽奖记录
+            </button>
+          </div>
+        </div>
+
         <div className="flex items-center justify-end gap-3 p-6 pt-4 border-t border-white/10 flex-shrink-0">
           <button type="button" onClick={() => { sfx.click(); onClose(); }} className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-medium transition-colors">
             取消

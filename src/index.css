@@ -22,7 +22,8 @@ body,
 
 body {
   @apply bg-[var(--csgo-bg)] text-white antialiased;
-  overflow: hidden;
+  overflow-y: auto;
+  overflow-x: hidden;
 }
 
 /* 隐藏滚动条 */

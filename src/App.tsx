@@ -1,4 +1,4 @@
-import { useMemo, useState, useEffect } from 'react'
+import { useMemo, useState, useEffect, useRef } from 'react'
 import './App.css'
 import { useAppStore } from './store/appStore'
 import SettingsModal from './components/SettingsModal'
@@ -6,7 +6,8 @@ import { AnimatePresence, motion } from 'framer-motion'
 import { sfx } from './lib/audioManager'
 import Roulette from './components/Roulette'
 import type { Rarity, Student } from './store/appStore'
-import { drawRarity as configDrawRarity, getWearLevelInfo } from './config/rarityConfig'
+import { drawRarity as configDrawRarity, getWearLevelInfo, drawWearLevel } from './config/rarityConfig'
+import type { WearLevel } from './config/rarityConfig'
 
 /**
  * 计算已抽取学生列表（用于不重复模式）
@@ -33,6 +34,7 @@ function App() {
     selectedStudent,
     resetPool,
   } = useAppStore()
+  const history = useAppStore((s) => s.history)
 
   // 移除仅用于重新读取 CSV 的选择器，逻辑迁移至设置面板
   // const replaceRosterFromText = useAppStore((s) => s.replaceRosterFromText)
@@ -46,6 +48,11 @@ function App() {
   // 揭晓后居中放大展示开关
   const [revealOpen, setRevealOpen] = useState(false)
   const [audioStatus, setAudioStatus] = useState(() => sfx.getCacheStatus())
+  // 收藏馆：搜索与排序控制
+  const [query, setQuery] = useState('')
+  const [sortKey, setSortKey] = useState<'time' | 'rarity' | 'wear'>('time')
+  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
+  const galleryRef = useRef<HTMLDivElement | null>(null)
 
   // 音量与设置联动（SFX + BGM）
   useEffect(() => {
@@ -158,6 +165,79 @@ function App() {
 
 
   /**
+   * 将稀有度映射为可比较的权重（值越大稀有度越高）
+   * @param r 稀有度键
+   * @returns 数值权重
+   */
+  function rarityOrderValue(r: Rarity): number {
+    switch (r) {
+      case 'gold': return 5
+      case 'red': return 4
+      case 'pink': return 3
+      case 'purple': return 2
+      case 'blue':
+      default: return 1
+    }
+  }
+
+  /**
+   * 将磨损等级映射为可比较的权重（值越小越新）
+   * @param level 磨损等级
+   * @returns 数值权重
+   */
+  function wearOrderValue(level: WearLevel): number {
+     // 由于类型推导限制，直接根据键名比较
+     switch (String(level)) {
+       case 'factory-new': return 1
+       case 'minimal-wear': return 2
+       case 'field-tested': return 3
+       case 'well-worn': return 4
+       case 'battle-scarred':
+       default: return 5
+     }
+   }
+
+  /**
+   * 将时间戳格式化为 yyyy-MM-dd HH:mm:ss
+   * @param ts 毫秒时间戳
+   * @returns 格式化后的字符串
+   */
+  function formatTime(ts: number): string {
+    const d = new Date(ts)
+    const pad = (n: number) => String(n).padStart(2, '0')
+    const y = d.getFullYear()
+    const m = pad(d.getMonth() + 1)
+    const day = pad(d.getDate())
+    const hh = pad(d.getHours())
+    const mm = pad(d.getMinutes())
+    const ss = pad(d.getSeconds())
+    return `${y}-${m}-${day} ${hh}:${mm}:${ss}`
+  }
+
+  /**
+   * 基于搜索与排序规则生成可见的历史记录列表
+   * - 默认时间倒序（最新在前）
+   * - 搜索按姓名包含匹配（不区分大小写）
+   */
+  const visibleRecords = useMemo(() => {
+    const q = query.trim().toLowerCase()
+    const base = q ? history.filter(h => h.name.toLowerCase().includes(q)) : history.slice()
+    base.sort((a, b) => {
+      let cmp = 0
+      if (sortKey === 'time') {
+        cmp = a.timestamp - b.timestamp
+      } else if (sortKey === 'rarity') {
+        cmp = rarityOrderValue(a.rarity) - rarityOrderValue(b.rarity)
+      } else {
+        // wear：按等级权重排序（更新 → 更旧）
+        cmp = wearOrderValue(a.wearLevel) - wearOrderValue(b.wearLevel)
+      }
+      return sortOrder === 'asc' ? cmp : -cmp
+    })
+    return base
+  }, [history, query, sortKey, sortOrder])
+
+  /**
    * 根据抽取结果构建滚动序列
    * - 生成若干填充项（受速度影响数量）+ 目标项
    * - 填充项赋予随机稀有度（非全部蓝色），目标项使用真实稀有度
@@ -205,7 +285,7 @@ function App() {
   )
 
   return (
-    <div className="min-h-screen w-full bg-[var(--csgo-bg)] text-white flex items-center justify-center">
+    <div className="min-h-screen bg-[var(--csgo-bg)] text-white relative">
       {/* 左侧：已抽取名单（仅在不重复模式显示，且大屏显示，动画结束后才显示避免透露结果） */}
       {settings.noRepeat && drawnStudents.length > 0 && !opening && (
         <div className="hidden lg:block fixed left-4 top-1/2 -translate-y-1/2 z-30 w-48 max-h-[80vh] overflow-y-auto">
@@ -223,76 +303,168 @@ function App() {
         </div>
       )}
 
-      <div className="text-center p-8 rounded-xl border border-white/10 bg-[var(--csgo-panel)]/60 backdrop-blur-sm w-[min(900px,95vw)]">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h1 className="text-3xl font-bold tracking-wide">Roll Call</h1>
-          </div>
-          <button className="px-3 py-1.5 rounded-md bg-zinc-700 hover:bg-zinc-600 border border-white/10 text-xs" onClick={() => { sfx.click(); setOpenSettings(true); }}>
-            设置
-          </button>
-        </div>
+      {/* 主抽奖区域 */}
+      <div className="min-h-screen flex items-center justify-center px-4">
+        <div className="text-center p-8 rounded-xl border border-white/10 bg-[var(--csgo-panel)]/60 backdrop-blur-sm w-[min(900px,95vw)] max-w-4xl">
+            <div className="flex items-center justify-between mb-4">
+              <div>
+                <h1 className="text-3xl font-bold tracking-wide">Roll Call</h1>
+              </div>
+              <button className="px-3 py-1.5 rounded-md bg-zinc-700 hover:bg-zinc-600 border border-white/10 text-xs" onClick={() => { sfx.click(); setOpenSettings(true); }}>
+                设置
+              </button>
+            </div>
 
-        <div className="mb-6 text-sm text-white/80">
-          <span className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 mr-2">班级：{settings.className}</span>
-          <span className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 mr-2">名单：{roster.length} 人</span>
-          <span className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 mr-2">抽取池：{poolCount} 人</span>
-          
-          {/* 音频状态指示器 - 就绪后自动消失 */}
-          {showAudioStatus && (
-            audioStatus.loaded ? (
-              <span className="inline-block px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 transition-opacity duration-500">
-                <span className="inline-block w-2 h-2 bg-green-400 rounded-full mr-1.5"></span>
-                音频就绪
-              </span>
-            ) : audioStatus.progress > 0 ? (
-              <span className="inline-block px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400">
-                <span className="inline-block w-2 h-2 bg-blue-400 rounded-full mr-1.5 animate-pulse"></span>
-                音频加载中 {Math.round(audioStatus.progress)}%
-              </span>
-            ) : (
-              <span className="inline-block px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-400">
-                <span className="inline-block w-2 h-2 bg-yellow-400 rounded-full mr-1.5"></span>
-                音频待加载
-              </span>
-            )
-          )}
-        </div>
+            <div className="mb-6 text-sm text-white/80">
+              <span className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 mr-2">班级：{settings.className}</span>
+              <span className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 mr-2">名单：{roster.length} 人</span>
+              <span className="inline-block px-3 py-1 rounded-full bg-white/5 border border-white/10 mr-2">抽取池：{poolCount} 人</span>
+              
+              {/* 音频状态指示器 - 就绪后自动消失 */}
+              {showAudioStatus && (
+                audioStatus.loaded ? (
+                  <span className="inline-block px-3 py-1 rounded-full bg-green-500/10 border border-green-500/30 text-green-400 transition-opacity duration-500">
+                    <span className="inline-block w-2 h-2 bg-green-400 rounded-full mr-1.5"></span>
+                    音频就绪
+                  </span>
+                ) : audioStatus.progress > 0 ? (
+                  <span className="inline-block px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-blue-400">
+                    <span className="inline-block w-2 h-2 bg-blue-400 rounded-full mr-1.5 animate-pulse"></span>
+                    音频加载中 {Math.round(audioStatus.progress)}%
+                  </span>
+                ) : (
+                  <span className="inline-block px-3 py-1 rounded-full bg-yellow-500/10 border border-yellow-500/30 text-yellow-400">
+                    <span className="inline-block w-2 h-2 bg-yellow-400 rounded-full mr-1.5"></span>
+                    音频待加载
+                  </span>
+                )
+              )}
+            </div>
 
-        {/* 轮盘滚动区域 */}
-        <div className="mb-6 min-h-[120px] flex items-center justify-center">
-          <AnimatePresence initial={false}>
-            {opening && rollItems && (
-              <Roulette
-                items={rollItems}
-                targetIndex={targetIndex}
-                speed={settings.speed}
-                onComplete={() => {
-                  // 揭晓音效
-                  const r = useAppStore.getState().lastResult
-                  if (r) sfx.reveal(r.rarity)
-                  // 揭晓后恢复 BGM 音量
-                  sfx.fadeBgmTo(settings.bgmVolume, 380)
-                  setOpening(false)
-                  // 播放结束后清空队列，显示到下方结果卡片
-                  setTimeout(() => setRollItems(null), 200)
-                  // 开启"居中放大"结果展示，改为点击关闭（无限展示）
-                  setRevealOpen(true)
-                  // 删除自动关闭逻辑
-                }}
+            {/* 轮盘滚动区域 */}
+            <div className="mb-6 min-h-[120px] flex items-center justify-center">
+              <AnimatePresence initial={false}>
+                {opening && rollItems && (
+                  <Roulette
+                    items={rollItems}
+                    targetIndex={targetIndex}
+                    speed={settings.speed}
+                    onComplete={() => {
+                      // 揭晓音效
+                      const r = useAppStore.getState().lastResult
+                      if (r) sfx.reveal(r.rarity)
+                      // 揭晓后恢复 BGM 音量
+                      sfx.fadeBgmTo(settings.bgmVolume, 380)
+                      setOpening(false)
+                      // 播放结束后清空队列，显示到下方结果卡片
+                      setTimeout(() => setRollItems(null), 200)
+                      // 开启"居中放大"结果展示，改为点击关闭（无限展示）
+                      setRevealOpen(true)
+                      // 删除自动关闭逻辑
+                    }}
+                  />
+                )}
+              </AnimatePresence>
+            </div>
+
+            {/* 操作按钮组 */}
+            <div className="relative h-[64px] flex items-center justify-center gap-4 mb-2">
+              <button className="px-6 py-3 rounded-lg bg-[var(--csgo-blue)] hover:bg-sky-500 transition-colors font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" onClick={handleDraw} disabled={roster.length === 0 || opening}>
+                {opening ? '抽取中…' : '开始抽取'}
+              </button>
+              <button className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 border border-amber-300/30 text-sm font-medium transition-colors" onClick={() => { sfx.click(); resetPool(); }} disabled={roster.length === 0} title="重置抽取池">
+                重置抽取池
+              </button>
+              <button
+                className="px-4 py-2 rounded-lg bg-white/10 hover:bg-white/15 border border-white/15 text-sm font-medium transition-colors"
+                onClick={() => { sfx.click(); galleryRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}
+                title="查看收藏馆"
+              >
+                查看收藏馆
+              </button>
+            </div>
+        </div>
+      </div>
+
+      {/* 收藏馆（历史记录） */}
+      <div ref={galleryRef} className="max-w-[980px] mx-auto px-4 md:px-0 pb-12">
+        <div className="h-10" />
+        <div className="sticky top-0 z-10 -mx-4 md:mx-0 px-4 md:px-0 py-3 backdrop-blur border-b border-white/10">
+          <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+            <div className="text-2xl font-bold tracking-wide">收藏馆</div>
+            <div className="flex items-center gap-3">
+              <input
+                value={query}
+                onChange={(e) => setQuery(e.target.value)}
+                placeholder="搜索姓名…"
+                className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm"
               />
-            )}
-          </AnimatePresence>
+              <select
+                value={sortKey}
+                onChange={(e) => setSortKey(e.target.value as any)}
+                className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 text-sm"
+                title="排序字段"
+              >
+                <option value="time">按时间</option>
+                <option value="rarity">按稀有度</option>
+                <option value="wear">按磨损</option>
+              </select>
+              <select
+                value={sortOrder}
+                onChange={(e) => setSortOrder(e.target.value as any)}
+                className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 text-sm"
+                title="排序方向"
+              >
+                <option value="desc">倒序</option>
+                <option value="asc">正序</option>
+              </select>
+            </div>
+          </div>
+          <div className="text-xs opacity-70 mt-1">共 {visibleRecords.length} 条记录，默认按抽中时间倒序</div>
         </div>
 
-        {/* 操作按钮组 */}
-        <div className="relative h-[64px] flex items-center justify-center gap-4 mb-2">
-          <button className="px-6 py-3 rounded-lg bg-[var(--csgo-blue)] hover:bg-sky-500 transition-colors font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" onClick={handleDraw} disabled={roster.length === 0 || opening}>
-            {opening ? '抽取中…' : '开始抽取'}
-          </button>
-          <button className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 border border-amber-300/30 text-sm font-medium transition-colors" onClick={() => { sfx.click(); resetPool(); }} disabled={roster.length === 0} title="重置抽取池">
-            重置抽取池
-          </button>
+        {/* 网格卡片 */}
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          {visibleRecords.map((r) => (
+          <div
+              key={`${r.id}-${r.timestamp}`}
+               className="rounded-xl border border-white/10 p-3 bg-black/20 shadow-md hover:shadow-lg transition-shadow"
+               style={{ background: rarityBg(r.rarity) }}
+               title={`${r.name} @ ${formatTime(r.timestamp)}`}
+             >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-sm font-bold text-white/90">
+                  {/* 安全首字母显示：优先历史记录中的 name，回退到 roster 中的姓名，再回退 '?' */}
+                  {(() => {
+                    const rosterMap = new Map(roster.map(s => [s.id, s]));
+                    const displayName = r.name ?? rosterMap.get(r.studentId)?.name ?? 'Unknown';
+                    const initial = (displayName && displayName.length > 0) ? displayName.charAt(0).toUpperCase() : '?';
+                    return initial;
+                  })()}
+                </div>
+                {/* 显示安全的名称 */}
+                {(() => {
+                  const rosterMap = new Map(roster.map(s => [s.id, s]));
+                  const displayName = r.name ?? rosterMap.get(r.studentId)?.name ?? 'Unknown';
+                  return <div className="font-semibold truncate" title={displayName}>{displayName}</div>;
+                })()}
+              </div>
+              <div className="text-[10px] opacity-80 mb-1">时间：{formatTime(r.timestamp)}</div>
+              <div className="text-[10px] opacity-80 mb-1">稀有度：{rarityLabelCN(r.rarity)}</div>
+              <div className="text-[10px] opacity-80">磨损：
+                {(() => {
+                  const wl = (r.wearLevel ?? drawWearLevel());
+                  const info = getWearLevelInfo(wl);
+                  return (
+                    <span className="ml-1 font-medium" style={{ color: info.color }}>
+                      {info.label}
+                    </span>
+                  );
+                })()}
+                <span className="ml-1 opacity-70">({(r.wearValue ?? 0).toFixed(4)})</span>
+               </div>
+            </div>
+          ))}
         </div>
       </div>
 
@@ -347,20 +519,23 @@ function App() {
                   {selectedStudent.name.charAt(0).toUpperCase()}
                 </div>
                 <div className="text-left flex-1 flex flex-col justify-center">
-                  <div className="text-3xl font-bold tracking-wide mb-1">{selectedStudent.name}</div>
-                  <div className="text-sm opacity-90 mb-2">稀有度：{rarityLabelCN(lastResult.rarity)}</div>
-                  <div className="text-[10px] text-white/60 whitespace-nowrap truncate">
-                    磨损：
-                    <span
-                      className="font-medium ml-1 opacity-80"
-                      style={{ color: getWearLevelInfo(lastResult.wearLevel).color }}
-                    >
-                      {getWearLevelInfo(lastResult.wearLevel).label}
-                    </span>
-                    <span className="mx-1">·</span>
-                    磨损值：{lastResult.wearValue.toFixed(4)}
-                  </div>
-                </div>
+                  <div className="text-3xl font-bold tracking-wide mb-1">{selectedStudent?.name ?? 'Unknown'}</div>
+                   <div className="text-sm opacity-90 mb-2">稀有度：{rarityLabelCN(lastResult.rarity)}</div>
+                   <div className="text-[10px] text-white/60 whitespace-nowrap truncate">
+                     磨损：
+                    {(() => {
+                      const wl = (lastResult?.wearLevel ?? drawWearLevel());
+                      const info = getWearLevelInfo(wl);
+                      return (
+                        <span className="font-medium ml-1 opacity-80" style={{ color: info.color }}>
+                          {info.label}
+                        </span>
+                      );
+                    })()}
+                     <span className="mx-1">·</span>
+                    磨损值：{(lastResult?.wearValue ?? 0).toFixed(4)}
+                   </div>
+                 </div>
               </div>
 
               {/* 稀有度色值与特效关键帧 */}

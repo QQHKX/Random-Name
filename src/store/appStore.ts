@@ -37,8 +37,20 @@ export interface AppSettings {
 /**
  * 抽取结果
  */
+/**
+ * 抽取结果（历史记录条目）
+ * - id：唯一ID（用于收藏馆渲染与潜在删除操作）
+ * - studentId：学生ID
+ * - name：学生姓名（冗余字段，便于直接渲染与搜索）
+ * - rarity：稀有度
+ * - wearLevel：磨损等级
+ * - wearValue：磨损值（0-1）
+ * - timestamp：时间戳（毫秒）
+ */
 export interface RollResult {
+  id: string;
   studentId: string;
+  name: string;
   rarity: Rarity;
   wearLevel: WearLevel;
   wearValue: number;
@@ -286,6 +298,7 @@ export const useAppStore = create<AppState>()(
 
       /**
        * 抽取下一个学生
+       * @returns {RollResult | undefined} 返回结果对象，或在无可抽取对象时返回 undefined
        */
       drawNext: () => {
         const state = get();
@@ -303,7 +316,15 @@ export const useAppStore = create<AppState>()(
         const rarity = drawRarity();
         const wearLevel = drawWearLevel();
         const wearValue = generateWearValue(wearLevel);
-        const result: RollResult = { studentId, rarity, wearLevel, wearValue, timestamp: Date.now() };
+        const result: RollResult = {
+          id: uid('roll'),
+          studentId,
+          name: student.name,
+          rarity,
+          wearLevel,
+          wearValue,
+          timestamp: Date.now(),
+        };
 
         set((s) => {
           // 更新池（不重复模式下移除选中者）
@@ -344,6 +365,27 @@ export const useAppStore = create<AppState>()(
           const s = useAppStore.getState();
           if (s.settings.noRepeat && s.pool.length === 0 && s.roster.length > 0) {
             s.resetPool();
+          }
+          // 迁移历史记录缺失字段：为旧数据补齐 id/name/rarity/wearLevel/wearValue/timestamp
+          // 说明：早期版本的 RollResult 可能缺少上述字段，这里统一补齐，避免 UI 渲染空值
+          const current = useAppStore.getState();
+          const patched = (current.history || []).map((r) => {
+            const anyR = r as any;
+            const stu = current.roster.find((x) => x.id === r.studentId);
+            const id = anyR.id ?? uid('roll');
+            const name = anyR.name ?? (stu?.name ?? 'Unknown');
+            const rarity = anyR.rarity ?? drawRarity();
+            const wearLevel = anyR.wearLevel ?? drawWearLevel();
+            const wearValue = anyR.wearValue ?? generateWearValue(wearLevel);
+            const timestamp = anyR.timestamp ?? Date.now();
+            return { id, studentId: r.studentId, name, rarity, wearLevel, wearValue, timestamp } as RollResult;
+          });
+          const changed = patched.length !== current.history.length || patched.some((x, i) => {
+            const y = (current.history[i] as any) || {};
+            return y.id !== x.id || y.name !== x.name || y.rarity !== x.rarity || y.wearLevel !== x.wearLevel || y.wearValue !== x.wearValue || y.timestamp !== x.timestamp;
+          });
+          if (changed) {
+            useAppStore.setState({ history: patched });
           }
         }
       },
