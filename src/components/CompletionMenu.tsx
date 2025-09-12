@@ -49,7 +49,7 @@ const CompletionMenu: React.FC<CompletionMenuProps> = ({
       <div className="w-full h-px bg-gradient-to-r from-transparent via-white/20 to-transparent mb-3" />
       
       {/* 按钮区域 */}
-      <div className="w-full flex justify-end gap-3 pl-2 pr-6">
+      <div className="w-full flex justify-end gap-3 pl-2 pr-12">
         <button
           className="px-6 py-2 bg-white/10 hover:bg-white/20 border border-white/20 rounded-lg text-white/90 text-sm font-medium transition-all duration-200 hover:scale-105"
           onClick={handleInspect}

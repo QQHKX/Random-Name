@@ -96,9 +96,9 @@ export default function LotteryScreen({
             // 点击遮罩关闭结果弹窗并退出全屏
             onClick={onClose}
           >
-            <div className="relative flex flex-col items-center justify-between h-full">
-              {/* 卡片容器 */}
-              <div className="flex-1 flex items-center justify-center">
+            <div className="relative w-full h-full">
+              {/* 卡片容器 - 绝对居中 */}
+              <div className="absolute inset-0 flex items-center justify-center">
                 <ResultCard
                   selectedStudent={selectedStudent}
                   lastResult={lastResult}
@@ -108,11 +108,13 @@ export default function LotteryScreen({
                 />
               </div>
               
-              {/* 底部区域：分割线和按钮 */}
-              <CompletionMenu
-                selectedStudent={selectedStudent}
-                onContinue={onContinue}
-              />
+              {/* 底部区域：分割线和按钮 - 固定在底部 */}
+              <div className="absolute bottom-0 left-0 right-0">
+                <CompletionMenu
+                  selectedStudent={selectedStudent}
+                  onContinue={onContinue}
+                />
+              </div>
             </div>
           </motion.div>
         )}

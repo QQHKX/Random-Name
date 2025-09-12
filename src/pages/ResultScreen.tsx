@@ -106,7 +106,7 @@ export default function ResultScreen({
                 damping: 25,
                 duration: 0.6
               }}
-              className="relative max-w-2xl w-full mt-24"
+              className="relative max-w-2xl w-full"
               onClick={(e) => e.stopPropagation()}
             >
 
@@ -124,7 +124,7 @@ export default function ResultScreen({
               </motion.div>
 
               {/* 装饰边框 */}
-              <div className="absolute -inset-4 border border-yellow-500/20 rounded-2xl pointer-events-none">
+              <div className="absolute -inset-8 border border-yellow-500/20 rounded-2xl pointer-events-none">
                 {/* 四角光效 */}
                 <div className="absolute -top-1 -left-1 w-4 h-4 bg-yellow-400/50 rounded-full blur-sm"></div>
                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400/50 rounded-full blur-sm"></div>
