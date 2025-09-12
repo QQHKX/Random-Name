@@ -4,6 +4,7 @@ import { useAppStore } from '../store/appStore'
 import type { Speed } from '../store/appStore'
 import * as XLSX from 'xlsx'
 import { sfx } from '../lib/audioManager'
+import ProbabilityDisplay from './ProbabilityDisplay'
 
 export interface SettingsModalProps {
   /** 是否显示弹窗 */
@@ -535,6 +536,12 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
             <div className="text-xs opacity-60 mt-2">
               提示：缓存将保持到页面刷新，建议在使用前先缓存以获得最佳体验。包含BGM和所有音效文件。
             </div>
+          </div>
+
+          {/* 概率公示 */}
+          <div className="pt-4 border-t border-white/10">
+            <div className="text-sm font-medium mb-3">概率公示</div>
+            <ProbabilityDisplay showWearLevels={false} />
           </div>
 
             </form>
