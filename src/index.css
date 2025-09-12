@@ -21,15 +21,9 @@ body,
 }
 
 body {
-  @apply bg-[var(--csgo-bg)] text-white antialiased font-sans;
+  @apply bg-[var(--csgo-bg)] text-white antialiased;
   overflow-y: auto;
   overflow-x: hidden;
-}
-
-/* 可访问性：统一焦点可见样式 */
-:focus-visible {
-  outline: 2px solid var(--csgo-blue);
-  outline-offset: 2px;
 }
 
 /* 隐藏滚动条 */
@@ -53,18 +47,16 @@ body {
 
 a {
   font-weight: 500;
-  color: #8acbff; /* 略微提亮以适配深色背景 */
+  color: #646cff;
   text-decoration: inherit;
 }
 
 a:hover {
-  color: #b6deff;
+  color: #535bf2;
 }
 
 body {
   margin: 0;
-  display: flex;
-  place-items: center;
   min-width: 320px;
   min-height: 100vh;
 }
@@ -79,32 +71,20 @@ button {
   border: 1px solid transparent;
   padding: 0.6em 1.2em;
   font-size: 1em;
-  font-weight: 600; /* 提升按钮字重 */
+  font-weight: 500;
   font-family: inherit;
   background-color: #1a1a1a;
   cursor: pointer;
-  transition: border-color 0.25s, box-shadow 0.25s, transform 0.05s;
+  transition: border-color 0.25s;
 }
 
 button:hover {
-  border-color: #4aa8e9;
-  box-shadow: 0 8px 24px rgba(0, 162, 255, 0.12);
-}
-
-button:active {
-  transform: translateY(1px);
+  border-color: #646cff;
 }
 
 button:focus,
 button:focus-visible {
-  outline: 2px solid var(--csgo-blue);
-  outline-offset: 2px;
-}
-
-/* 卡片与面板的通用阴影与边框微光 */
-.card-surface {
-  @apply bg-[var(--csgo-panel)]/80 border border-white/10 backdrop-blur-sm;
-  box-shadow: 0 8px 32px rgba(0,0,0,0.35), 0 0 0 1px rgba(255,255,255,0.04) inset;
+  outline: 4px auto -webkit-focus-ring-color;
 }
 
 @keyframes pulseGlow {
@@ -123,12 +103,26 @@ button:focus-visible {
 
 @keyframes shimmer {
   0% {
-    background-position: 200% 0;
+    background-position: -200% 0;
   }
 
   100% {
-    background-position: -200% 0;
+    background-position: 200% 0;
   }
+}
+
+@keyframes spin-slow {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin-slow {
+  animation: spin-slow 20s linear infinite;
 }
 
 @media (prefers-color-scheme: light) {
@@ -141,8 +135,9 @@ button:focus-visible {
     @apply bg-white text-gray-900;
   }
 
-  a { color: #2d6cdf; }
-  a:hover { color: #1f4fb1; }
+  a:hover {
+    color: #747bff;
+  }
 
   button {
     background-color: #f9f9f9;
@@ -150,13 +145,39 @@ button:focus-visible {
   }
 
   /* 确保所有按钮在浅色模式下有足够的对比度 */
-  .bg-zinc-700 { @apply bg-gray-200 text-gray-900; }
-  .bg-zinc-600 { @apply bg-gray-300 text-gray-900; }
-  .bg-white\/5 { @apply bg-gray-100 text-gray-900; }
-  .bg-white\/10 { @apply bg-gray-200 text-gray-900; }
-  .text-white { @apply text-gray-900; }
-  .text-white\/70 { @apply text-gray-600; }
-  .text-white\/80 { @apply text-gray-700; }
-  .border-white\/10 { @apply border-gray-300; }
-  .border-white\/20 { @apply border-gray-400; }
+  .bg-zinc-700 {
+    @apply bg-gray-200 text-gray-900;
+  }
+
+  .bg-zinc-600 {
+    @apply bg-gray-300 text-gray-900;
+  }
+
+  .bg-white\/5 {
+    @apply bg-gray-100 text-gray-900;
+  }
+
+  .bg-white\/10 {
+    @apply bg-gray-200 text-gray-900;
+  }
+
+  .text-white {
+    @apply text-gray-900;
+  }
+
+  .text-white\/70 {
+    @apply text-gray-600;
+  }
+
+  .text-white\/80 {
+    @apply text-gray-700;
+  }
+
+  .border-white\/10 {
+    @apply border-gray-300;
+  }
+
+  .border-white\/20 {
+    @apply border-gray-400;
+  }
 }
