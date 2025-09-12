@@ -37,8 +37,8 @@ export default function RouletteScreen({
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          transition={{ duration: 0.3 }}
+          exit={{ opacity: 0, y: -50 }}
+          transition={{ duration: 0.4, ease: "easeInOut" }}
           className="fixed inset-0 z-50 bg-black/95 backdrop-blur-sm"
         >
           {/* 全屏轮盘容器 */}
@@ -76,7 +76,11 @@ export default function RouletteScreen({
               <motion.div
                 initial={{ y: -50, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.2, duration: 0.5 }}
+                exit={{ y: -30, opacity: 0 }}
+                transition={{ 
+                  initial: { delay: 0.2, duration: 0.5 },
+                  exit: { duration: 0.3, ease: "easeIn" }
+                }}
                 className="text-center mb-8"
               >
                 <h2 className="text-4xl font-bold text-white mb-2">
@@ -91,7 +95,11 @@ export default function RouletteScreen({
               <motion.div
                 initial={{ scale: 0.8, opacity: 0 }}
                 animate={{ scale: 1, opacity: 1 }}
-                transition={{ delay: 0, duration: 0.2, ease: "easeOut" }}
+                exit={{ scale: 0.9, opacity: 0, y: -20 }}
+                transition={{ 
+                  initial: { delay: 0, duration: 0.2, ease: "easeOut" },
+                  exit: { duration: 0.35, ease: "easeIn" }
+                }}
                 className="relative"
               >
                 {rollItems && (
@@ -108,12 +116,16 @@ export default function RouletteScreen({
               <motion.div
                 initial={{ y: 50, opacity: 0 }}
                 animate={{ y: 0, opacity: 1 }}
-                transition={{ delay: 0.6, duration: 0.5 }}
+                exit={{ y: -20, opacity: 0 }}
+                transition={{ 
+                  initial: { delay: 0.6, duration: 0.5 },
+                  exit: { duration: 0.25, ease: "easeIn" }
+                }}
                 className="text-center mt-8"
               >
                 <div className="flex items-center justify-center gap-2 text-gray-400">
                   <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                  <span className="text-sm">CSGO 风格抽奖系统</span>
+                  <span className="text-sm">QQHKX 抽奖系统</span>
                   <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
                 </div>
               </motion.div>

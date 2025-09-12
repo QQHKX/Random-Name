@@ -118,7 +118,7 @@ const Gallery = forwardRef<HTMLDivElement, GalleryProps>(({ className = '' }, re
             <select
               value={sortKey}
               onChange={(e) => setSortKey(e.target.value as any)}
-              className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 text-sm"
+              className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 text-sm [&>option]:bg-gray-800 [&>option]:text-white"
               title="排序字段"
             >
               <option value="time">按时间</option>
@@ -128,7 +128,7 @@ const Gallery = forwardRef<HTMLDivElement, GalleryProps>(({ className = '' }, re
             <select
               value={sortOrder}
               onChange={(e) => setSortOrder(e.target.value as any)}
-              className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 text-sm"
+              className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 text-sm [&>option]:bg-gray-800 [&>option]:text-white"
               title="排序方向"
             >
               <option value="desc">倒序</option>

@@ -1,10 +1,14 @@
-import { useState, useEffect, useMemo, useRef } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import './App.css'
 import { useAppStore } from './store/appStore'
 import SettingsModal from './components/SettingsModal'
 import RouletteScreen from './pages/RouletteScreen'
 import ResultScreen from './pages/ResultScreen'
 import Gallery from './components/Gallery'
+import Footer from './components/Footer'
+import DrawnStudentsSidebar from './components/DrawnStudentsSidebar'
+import SystemStatusPanel from './components/SystemStatusPanel'
+import SettingsPanel from './components/SettingsPanel'
 import { sfx } from './lib/audioManager'
 import type { Rarity, Student } from './store/appStore'
 import { drawRarity as configDrawRarity } from './config/rarityConfig'
@@ -51,8 +55,7 @@ function App() {
   // 计算已抽取学生列表
   const drawnStudents = getDrawnStudents(roster, pool, settings.noRepeat)
   
-  // 计算抽取池人数
-  const poolCount = settings.noRepeat ? pool.length : roster.length
+
 
   // 音量与设置联动（SFX + BGM）
   useEffect(() => {
@@ -88,17 +91,7 @@ function App() {
     return () => clearInterval(statusInterval)
   }, [])
 
-  // 音频就绪状态自动消失
-  const [showAudioStatus, setShowAudioStatus] = useState(true)
-  useEffect(() => {
-    if (audioStatus.loaded) {
-      // 音频加载完成后3秒自动隐藏状态指示器
-      const timer = setTimeout(() => {
-        setShowAudioStatus(false)
-      }, 3000)
-      return () => clearTimeout(timer)
-    }
-  }, [audioStatus.loaded])
+
 
   // 首次交互时解锁音频并淡入 BGM（只需在一次点击后触发）
   useEffect(() => {
@@ -234,10 +227,12 @@ function App() {
     if (r) sfx.reveal(r.rarity)
     // 揭晓后恢复 BGM 音量
     sfx.fadeBgmTo(settings.bgmVolume, 380)
-    // 播放结束后清空队列
-    setTimeout(() => setRollItems(null), 200)
-    // 切换到结果页面
-    setCurrentPage('result')
+    // 先清空队列，再切换页面，避免轮盘在结果页面显示时抽动
+    setRollItems(null)
+    // 延迟切换到结果页面，让轮盘退出动画完成（0.4秒）
+    setTimeout(() => {
+      setCurrentPage('result')
+    }, 10)
   }
 
   /**
@@ -279,31 +274,9 @@ function App() {
             
             {/* 左侧边栏：已抽取名单 */}
             <div className="col-span-12 lg:col-span-3 xl:col-span-2 order-3 lg:order-1 p-3 lg:pl-3 lg:pr-2">
-              {settings.noRepeat && drawnStudents.length > 0 && currentPage === 'home' && (
-                <div className="sticky top-3">
-                  <div className="bg-[var(--csgo-panel)]/80 backdrop-blur-xl rounded-2xl border border-white/10 p-3 lg:p-4 shadow-2xl">
-                    <div className="flex items-center gap-3 mb-4">
-                      <div className="w-3 h-3 bg-green-400 rounded-full animate-pulse"></div>
-                      <h3 className="text-base lg:text-lg font-semibold text-white">已抽取名单</h3>
-                    </div>
-                    <div className="text-sm text-white/60 mb-4">
-                      {drawnStudents.length} / {roster.length} 人
-                    </div>
-                    <div className="max-h-[40vh] lg:max-h-[60vh] overflow-y-auto space-y-0.5">
-                      {drawnStudents.map((s, idx) => (
-                        <div key={s.id} className="flex items-center gap-1.5 p-1 rounded-md bg-white/5 border border-white/10 hover:bg-white/10 transition-colors">
-                          <div className="w-4 h-4 lg:w-5 lg:h-5 rounded-full bg-gradient-to-r from-[var(--csgo-blue)] to-[var(--csgo-orange)] flex items-center justify-center text-xs font-bold text-white flex-shrink-0">
-                            {idx + 1}
-                          </div>
-                          <div className="flex-1 truncate text-xs font-medium" title={s.name}>
-                            {s.name}
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              )}
+              <DrawnStudentsSidebar 
+                visible={settings.noRepeat && drawnStudents.length > 0 && currentPage === 'home'}
+              />
             </div>
 
             {/* 主内容区域 */}
@@ -322,87 +295,30 @@ function App() {
                       Roll Call
                     </h1>
                   </div>
-                  <p className="text-white/60 text-base lg:text-lg">CSGO 风格班级点名系统</p>
+                  <p className="text-white/60 text-base lg:text-lg">QQHKX 班级点名系统</p>
                 </div>
 
                 {/* 主控制面板 */}
                  <div className="w-full max-w-2xl">
                    <div className="bg-[var(--csgo-panel)]/80 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/10 p-4 lg:p-8 shadow-2xl">
-                     
-                     {/* 状态信息卡片 */}
-                     <div className="grid grid-cols-3 gap-2 lg:gap-4 mb-6 lg:mb-8">
-                       <div className="bg-white/5 rounded-lg lg:rounded-xl p-3 lg:p-4 border border-white/10">
-                         <div className="text-white/60 text-xs lg:text-sm mb-1">班级</div>
-                         <div className="text-white text-sm lg:text-base font-semibold truncate">{settings.className}</div>
-                       </div>
-                       <div className="bg-white/5 rounded-lg lg:rounded-xl p-3 lg:p-4 border border-white/10">
-                         <div className="text-white/60 text-xs lg:text-sm mb-1">总人数</div>
-                         <div className="text-white text-sm lg:text-base font-semibold">{roster.length} 人</div>
-                       </div>
-                       <div className="bg-white/5 rounded-lg lg:rounded-xl p-3 lg:p-4 border border-white/10">
-                         <div className="text-white/60 text-xs lg:text-sm mb-1">抽取池</div>
-                         <div className="text-white text-sm lg:text-base font-semibold">{poolCount} 人</div>
-                       </div>
+                     {/* 操作按钮组 */}
+                     <div className="flex flex-col gap-6">
+                       {/* 主要抽取按钮 */}
+                       <button 
+                         className="w-full px-12 py-8 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 hover:border-white/30 transition-all duration-300 font-bold text-white text-xl disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/10 disabled:hover:border-white/20" 
+                         onClick={handleDraw} 
+                         disabled={roster.length === 0 || currentPage !== 'home'}
+                       >
+                         <div className="flex items-center justify-center gap-4">
+                           <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M19 10a9 9 0 11-18 0 9 9 0 0118 0z" />
+                           </svg>
+                           <span>{currentPage !== 'home' ? '抽取中...' : '开始抽取'}</span>
+                         </div>
+                       </button>
                      </div>
-
-                    {/* 音频状态指示器 */}
-                    {showAudioStatus && (
-                      <div className="mb-6">
-                        {audioStatus.loaded ? (
-                          <div className="flex items-center gap-3 p-4 rounded-xl bg-green-500/10 border border-green-500/30">
-                            <div className="w-3 h-3 bg-green-400 rounded-full"></div>
-                            <span className="text-green-400 font-medium">音频系统就绪</span>
-                          </div>
-                        ) : audioStatus.progress > 0 ? (
-                          <div className="flex items-center gap-3 p-4 rounded-xl bg-blue-500/10 border border-blue-500/30">
-                            <div className="w-3 h-3 bg-blue-400 rounded-full animate-pulse"></div>
-                            <span className="text-blue-400 font-medium">音频加载中 {Math.round(audioStatus.progress)}%</span>
-                            <div className="flex-1 bg-white/10 rounded-full h-2 ml-3">
-                              <div className="bg-blue-400 h-2 rounded-full transition-all duration-300" style={{width: `${audioStatus.progress}%`}}></div>
-                            </div>
-                          </div>
-                        ) : (
-                          <div className="flex items-center gap-3 p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/30">
-                            <div className="w-3 h-3 bg-yellow-400 rounded-full"></div>
-                            <span className="text-yellow-400 font-medium">音频待加载</span>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-
-
-                    {/* 操作按钮组 */}
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      <button 
-                        className="flex-1 px-8 py-4 rounded-xl bg-gradient-to-r from-[var(--csgo-blue)] to-blue-600 hover:from-blue-600 hover:to-[var(--csgo-blue)] transition-all duration-300 font-semibold text-white shadow-lg shadow-blue-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transform hover:scale-105 active:scale-95" 
-                        onClick={handleDraw} 
-                        disabled={roster.length === 0 || currentPage !== 'home'}
-                      >
-                        <div className="flex items-center justify-center gap-3">
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M19 10a9 9 0 11-18 0 9 9 0 0118 0z" />
-                          </svg>
-                          <span>{currentPage !== 'home' ? '抽取中...' : '开始抽取'}</span>
-                        </div>
-                      </button>
-                      
-                      <button 
-                        className="px-6 py-4 rounded-xl bg-gradient-to-r from-amber-600 to-orange-600 hover:from-orange-600 hover:to-amber-600 transition-all duration-300 font-medium text-white shadow-lg shadow-amber-500/25 disabled:opacity-50 disabled:cursor-not-allowed disabled:shadow-none transform hover:scale-105 active:scale-95" 
-                        onClick={handleResetPool} 
-                        disabled={roster.length === 0}
-                        title="重置抽取池"
-                      >
-                        <div className="flex items-center justify-center gap-2">
-                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                          </svg>
-                          <span>重置</span>
-                        </div>
-                      </button>
-                    </div>
-                  </div>
-                </div>
+                   </div>
+                 </div>
               </div>
             </div>
 
@@ -410,49 +326,15 @@ function App() {
             <div className="col-span-12 lg:col-span-3 xl:col-span-2 order-2 lg:order-3 p-6 lg:pl-3 lg:pr-6">
               <div className="sticky top-6 space-y-4 lg:space-y-6">
                 
-                {/* 设置面板 */}
-                <div className="bg-[var(--csgo-panel)]/80 backdrop-blur-xl rounded-2xl border border-white/10 p-4 lg:p-6 shadow-2xl">
-                  <h3 className="text-base lg:text-lg font-semibold text-white mb-3 lg:mb-4 flex items-center gap-2 lg:gap-3">
-                    <svg className="w-4 h-4 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                    </svg>
-                    <span className="hidden sm:inline">系统设置</span>
-                    <span className="sm:hidden">设置</span>
-                  </h3>
-                  <button 
-                    className="w-full px-3 lg:px-4 py-2 lg:py-3 rounded-lg lg:rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors text-white text-sm lg:text-base font-medium" 
-                    onClick={() => { sfx.click(); setOpenSettings(true); }}
-                  >
-                    <span className="hidden sm:inline">打开设置面板</span>
-                    <span className="sm:hidden">设置</span>
-                  </button>
-                </div>
-
                 {/* 系统状态 */}
-                <div className="bg-[var(--csgo-panel)]/80 backdrop-blur-xl rounded-2xl border border-white/10 p-4 lg:p-6 shadow-2xl">
-                  <h3 className="text-base lg:text-lg font-semibold text-white mb-3 lg:mb-4 flex items-center gap-2 lg:gap-3">
-                    <svg className="w-4 h-4 lg:w-5 lg:h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v4a2 2 0 01-2 2h-2a2 2 0 00-2-2z" />
-                    </svg>
-                    <span className="hidden sm:inline">系统状态</span>
-                    <span className="sm:hidden">状态</span>
-                  </h3>
-                  <div className="space-y-2 lg:space-y-3">
-                    <div className="flex items-center justify-between">
-                      <span className="text-white/60 text-xs lg:text-sm">不重复模式</span>
-                      <div className={`w-2 h-2 rounded-full ${settings.noRepeat ? 'bg-green-400' : 'bg-gray-400'}`}></div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-white/60 text-xs lg:text-sm">音频系统</span>
-                      <div className={`w-2 h-2 rounded-full ${audioStatus.loaded ? 'bg-green-400' : 'bg-yellow-400'}`}></div>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="text-white/60 text-xs lg:text-sm">抽奖状态</span>
-                      <div className={`w-2 h-2 rounded-full ${currentPage !== 'home' ? 'bg-blue-400 animate-pulse' : 'bg-gray-400'}`}></div>
-                    </div>
-                  </div>
-                </div>
+                <SystemStatusPanel audioStatus={audioStatus} />
+
+                {/* 设置面板 */}
+                <SettingsPanel 
+                  onOpenSettings={() => setOpenSettings(true)}
+                  onResetPool={handleResetPool}
+                  resetDisabled={roster.length === 0}
+                />
               </div>
             </div>
           </div>
@@ -481,6 +363,9 @@ function App() {
         onContinue={handleContinue}
         onClose={handleCloseResult}
       />
+
+      {/* 页脚组件 */}
+      {currentPage === 'home' && <Footer />}
 
       {/* 设置面板挂载 */}
       <SettingsModal open={openSettings} onClose={() => setOpenSettings(false)} />

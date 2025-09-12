@@ -28,9 +28,17 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
   const [volume, setVolumeLocal] = useState(settings.sfxVolume)
   const [bgmVolume, setBgmVolumeLocal] = useState(settings.bgmVolume)
   
-  // 手动导入相关状态
-  const [showManualImport, setShowManualImport] = useState(false)
+  // 手动修改相关状态
+  const [showManualEdit, setShowManualEdit] = useState(false)
   const [manualText, setManualText] = useState('')
+  
+  // 当展开手动修改时，自动填充当前名单内容
+  useEffect(() => {
+    if (showManualEdit && manualText === '') {
+      const currentRosterText = roster.map(student => student.name).join('\n')
+      setManualText(currentRosterText)
+    }
+  }, [showManualEdit, roster, manualText])
   
   // 音频缓存相关状态
   const [cacheStatus, setCacheStatus] = useState({ loaded: false, progress: 0 })
@@ -67,65 +75,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
    * - 失败则回退到 MD.xlsx
    * - 导入成功后重置抽取池
    */
-  const handleImportDemo = async () => {
-    try {
-      // 若已存在名单，提示覆盖确认
-      if (roster.length > 0) {
-        const ok = confirm('当前已有名单，确定要覆盖为示例名单吗？')
-        if (!ok) return
-      }
-      let importedCount = 0
-      // 尝试 CSV
-      try {
-        const respCsv = await fetch('/MD.csv')
-        if (respCsv.ok) {
-          const txt = await respCsv.text()
-          const wb = XLSX.read(txt, { type: 'string' })
-          const first = wb.SheetNames[0]
-          const ws = wb.Sheets[first]
-          const rows = XLSX.utils.sheet_to_json(ws, { header: 1, defval: '' }) as any[][]
-          const names = rows
-            .map((r) => String(r?.[0] ?? '').trim())
-            .filter((n) => n && n.toLowerCase() !== 'name' && n !== '姓名')
-          if (names.length > 0) {
-            importedCount = importFromText(names.join('\n'))
-          }
-        }
-      } catch {}
 
-      // 回退到 XLSX
-      if (importedCount === 0) {
-        const resp = await fetch('/MD.xlsx')
-        if (resp.ok) {
-          const arrayBuf = await resp.arrayBuffer()
-          const wb = XLSX.read(arrayBuf, { type: 'array' })
-          const first = wb.SheetNames[0]
-          const ws = wb.Sheets[first]
-          const json: any[] = XLSX.utils.sheet_to_json(ws, { defval: '' })
-          const names: string[] = []
-          json.forEach((row) => {
-            if (row.name && typeof row.name === 'string') names.push(String(row.name).trim())
-            else {
-              const firstKey = Object.keys(row)[0]
-              if (firstKey) names.push(String(row[firstKey]).trim())
-            }
-          })
-          const text = names.filter(Boolean).join('\n')
-          importedCount = importFromText(text)
-        }
-      }
-
-      if (importedCount > 0) {
-        resetPool()
-        alert(`已导入示例名单：${importedCount} 人`)
-      } else {
-        alert('未能解析到姓名，请检查 public/MD.csv 或 MD.xlsx 文件内容。')
-      }
-    } catch (e) {
-      console.warn('导入示例名单失败：', e)
-      alert('导入失败，请查看控制台日志。')
-    }
-  }
 
   /**
    * 强制重新读取 public/MD.csv（跳过缓存）并覆盖当前名单
@@ -239,36 +189,29 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
   }
 
   /**
-   * 处理手动文本导入
+   * 处理手动修改名单
    * - 支持每行一个姓名的格式
    * - 自动过滤空行和重复项
-   * - 导入成功后重置抽取池
+   * - 修改成功后重置抽取池
    */
-  const handleManualImport = () => {
+  const handleManualEdit = () => {
     if (!manualText.trim()) {
       alert('请输入名单内容')
       return
-    }
-
-    // 确认覆盖
-    if (roster.length > 0) {
-      const ok = confirm('当前已有名单，确定要覆盖吗？')
-      if (!ok) return
     }
 
     try {
       const cnt = replaceRosterFromText(manualText.trim())
       if (cnt > 0) {
         resetPool()
-        alert(`已导入名单：${cnt} 人`)
-        setManualText('')
-        setShowManualImport(false)
+        alert(`名单已更新：${cnt} 人`)
+        setShowManualEdit(false)
       } else {
         alert('未能解析到有效姓名')
       }
     } catch (e) {
-      console.warn('手动导入失败：', e)
-      alert('导入失败，请检查输入格式')
+      console.warn('手动修改失败：', e)
+      alert('修改失败，请检查输入格式')
     }
   }
 
@@ -417,19 +360,16 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
           <div className="pt-4 border-t border-white/10">
             <div className="text-sm font-medium mb-3">名单管理</div>
             
-            {/* 预设导入按钮 */}
+            {/* 示例数据选项 */}
             <div className="flex items-center gap-3 flex-wrap mb-3">
-              <button type="button" className="px-3 py-2 rounded-lg bg-[var(--csgo-blue)] hover:bg-sky-500 border border-sky-300/30 text-sm font-medium transition-colors" onClick={() => { sfx.click(); handleImportDemo(); }}>
-                导入示例名单 (MD.csv/MD.xlsx)
-              </button>
-              <button type="button" className="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 border border-amber-300/30 text-sm font-medium transition-colors" onClick={() => { sfx.click(); handleReloadRoster(); }} title="强制重新载入 public/MD.csv">
-                重新读取 MD.csv（跳过缓存）
+              <button type="button" className="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 border border-amber-300/30 text-sm font-medium transition-colors" onClick={() => { sfx.click(); handleReloadRoster(); }} title="清除缓存并使用示例数据">
+                使用示例数据（清除缓存）
               </button>
             </div>
             
-            {/* 手动导入区域 */}
+            {/* 手动修改区域 */}
             <div className="border border-white/10 rounded-lg p-3 bg-white/5">
-              <div className="text-sm font-medium mb-2">手动导入名单</div>
+              <div className="text-sm font-medium mb-2">手动修改名单</div>
               
               {/* 文件上传 */}
               <div className="mb-3">
@@ -442,40 +382,40 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
                 />
               </div>
               
-              {/* 手动输入切换 */}
+              {/* 手动修改切换 */}
               <div className="flex items-center gap-2 mb-2">
                 <button
                   type="button"
-                  onClick={() => { sfx.click(); setShowManualImport(!showManualImport); }}
+                  onClick={() => { sfx.click(); setShowManualEdit(!showManualEdit); }}
                   className="px-3 py-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 border border-white/10 text-xs font-medium transition-colors"
                 >
-                  {showManualImport ? '收起' : '展开'}手动输入
+                  {showManualEdit ? '收起' : '展开'}手动修改
                 </button>
               </div>
               
-              {/* 手动输入区域 */}
-              {showManualImport && (
+              {/* 手动修改区域 */}
+              {showManualEdit && (
                 <div className="space-y-2">
-                  <label className="block text-xs opacity-80">手动输入名单（每行一个姓名）</label>
+                  <label className="block text-xs opacity-80">手动修改名单（每行一个姓名）</label>
                   <textarea
                     value={manualText}
                     onChange={(e) => setManualText(e.target.value)}
                     placeholder="张三\n李四\n王五\n..."
-                    className="w-full h-24 px-3 py-2 rounded-lg bg-white/5 border border-white/10 outline-none focus:ring-2 focus:ring-[var(--csgo-blue)] transition-colors text-sm resize-none"
+                    className="w-full h-32 px-3 py-2 rounded-lg bg-white/5 border border-white/10 outline-none focus:ring-2 focus:ring-[var(--csgo-blue)] transition-colors text-sm resize-none"
                   />
                   <div className="flex items-center gap-2">
                     <button
                       type="button"
-                      onClick={handleManualImport}
+                      onClick={handleManualEdit}
                       className="px-3 py-1.5 rounded-lg bg-[var(--csgo-blue)] hover:bg-sky-500 border border-sky-300/30 text-xs font-medium transition-colors"
                     >
-                      导入
+                      保存修改
                     </button>
                     <button
                       type="button"
                       onClick={() => {
+                        setShowManualEdit(false)
                         setManualText('')
-                        setShowManualImport(false)
                       }}
                       className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-xs font-medium transition-colors"
                     >
@@ -486,7 +426,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
               )}
             </div>
             
-            <div className="text-xs opacity-60 mt-2">提示：导入/重载将覆盖当前名单，并自动重置抽取池。支持CSV、XLSX文件或手动输入。</div>
+            <div className="text-xs opacity-60 mt-2">提示：导入/重载将覆盖当前名单，并自动重置抽取池。支持CSV、XLSX文件或手动修改。</div>
           </div>
 
           {/* 音频缓存管理 */}
