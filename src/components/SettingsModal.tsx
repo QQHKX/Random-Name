@@ -51,6 +51,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
   /** 提交设置（写回 store，并关闭弹窗） */
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    sfx.click()
     setClassName(className.trim())
     toggleNoRepeat(noRepeat)
     setSpeed(speed)
@@ -417,10 +418,10 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
             
             {/* 预设导入按钮 */}
             <div className="flex items-center gap-3 flex-wrap mb-3">
-              <button type="button" className="px-3 py-2 rounded-lg bg-[var(--csgo-blue)] hover:bg-sky-500 border border-sky-300/30 text-sm font-medium transition-colors" onClick={handleImportDemo}>
+              <button type="button" className="px-3 py-2 rounded-lg bg-[var(--csgo-blue)] hover:bg-sky-500 border border-sky-300/30 text-sm font-medium transition-colors" onClick={() => { sfx.click(); handleImportDemo(); }}>
                 导入示例名单 (MD.csv/MD.xlsx)
               </button>
-              <button type="button" className="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 border border-amber-300/30 text-sm font-medium transition-colors" onClick={handleReloadRoster} title="强制重新载入 public/MD.csv">
+              <button type="button" className="px-3 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 border border-amber-300/30 text-sm font-medium transition-colors" onClick={() => { sfx.click(); handleReloadRoster(); }} title="强制重新载入 public/MD.csv">
                 重新读取 MD.csv（跳过缓存）
               </button>
             </div>
@@ -444,7 +445,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
               <div className="flex items-center gap-2 mb-2">
                 <button
                   type="button"
-                  onClick={() => setShowManualImport(!showManualImport)}
+                  onClick={() => { sfx.click(); setShowManualImport(!showManualImport); }}
                   className="px-3 py-1.5 rounded-lg bg-zinc-700 hover:bg-zinc-600 border border-white/10 text-xs font-medium transition-colors"
                 >
                   {showManualImport ? '收起' : '展开'}手动输入
@@ -558,7 +559,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
             <div className="flex items-center gap-3 flex-wrap">
               <button 
                 type="button" 
-                onClick={handleCacheAllAudio}
+                onClick={() => { sfx.click(); handleCacheAllAudio(); }}
                 disabled={isCaching || cacheStatus.loaded}
                 className="px-4 py-2 rounded-lg bg-[var(--csgo-blue)] hover:bg-sky-500 border border-sky-300/30 text-sm font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
@@ -568,7 +569,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
               {cacheStatus.loaded && (
                 <button 
                   type="button" 
-                  onClick={handleClearCache}
+                  onClick={() => { sfx.click(); handleClearCache(); }}
                   className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-500 border border-red-300/30 text-sm font-medium transition-colors"
                 >
                   清除缓存
@@ -585,7 +586,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
         </div>
         
         <div className="flex items-center justify-end gap-3 p-6 pt-4 border-t border-white/10 flex-shrink-0">
-          <button type="button" onClick={onClose} className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-medium transition-colors">
+          <button type="button" onClick={() => { sfx.click(); onClose(); }} className="px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-white/10 text-sm font-medium transition-colors">
             取消
           </button>
           <button type="submit" form="settings-form" className="px-4 py-2 rounded-lg bg-[var(--csgo-blue)] hover:bg-sky-500 border border-sky-300/30 text-sm font-semibold transition-colors shadow-lg">

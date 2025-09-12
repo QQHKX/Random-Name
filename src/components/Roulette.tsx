@@ -22,8 +22,6 @@ export interface RouletteProps {
   targetIndex: number
   /** 动画速度 */
   speed: 'slow' | 'normal' | 'fast'
-  /** 是否开始动画 */
-  startAnimation: boolean
   /** 动画完成回调（减速停止并高亮后触发） */
   onComplete?: () => void
 }
@@ -70,7 +68,7 @@ function xToIndex(x: number, centerOffset: number) {
   return Math.round((centerOffset - x) / STEP)
 }
 
-export default function Roulette({ items, targetIndex, speed, startAnimation, onComplete }: RouletteProps) {
+export default function Roulette({ items, targetIndex, speed, onComplete }: RouletteProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const [centerOffset, setCenterOffset] = useState(0)
   const [stopped, setStopped] = useState(false)
@@ -191,7 +189,6 @@ export default function Roulette({ items, targetIndex, speed, startAnimation, on
   useEffect(() => {
     if (!wrapRef.current) return
     if (!items || items.length === 0) return
-    if (!startAnimation) return
 
     setStopped(false)
 
@@ -229,7 +226,8 @@ export default function Roulette({ items, targetIndex, speed, startAnimation, on
     // 先设置起始位置
     controls.set({ x: x0 })
 
-    // 开场提示音效已移至App.tsx中的开锁音效，此处不再播放
+    // 播放一次开场提示（可选）：轻微滴答，营造开动的感觉
+    try { sfx.tick(0.9, baseTickFreq) } catch {}
 
     requestAnimationFrame(() => {
       controls.start({
@@ -237,7 +235,7 @@ export default function Roulette({ items, targetIndex, speed, startAnimation, on
         transition: { duration, ease: CSGO_EASE },
       })
     })
-  }, [items, targetIndex, centerOffset, duration, controls, startAnimation])
+  }, [items, targetIndex, centerOffset, duration, controls])
 
   // onUpdate 里做滴答触发：当“经过的卡片索引”变化时播放一次
   const handleUpdate = (latest: any) => {

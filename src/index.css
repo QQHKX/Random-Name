@@ -118,11 +118,53 @@ button:focus-visible {
     background-color: #ffffff;
   }
 
+  body {
+    @apply bg-white text-gray-900;
+  }
+
   a:hover {
     color: #747bff;
   }
 
   button {
     background-color: #f9f9f9;
+    color: #213547;
+  }
+
+  /* 确保所有按钮在浅色模式下有足够的对比度 */
+  .bg-zinc-700 {
+    @apply bg-gray-200 text-gray-900;
+  }
+
+  .bg-zinc-600 {
+    @apply bg-gray-300 text-gray-900;
+  }
+
+  .bg-white\/5 {
+    @apply bg-gray-100 text-gray-900;
+  }
+
+  .bg-white\/10 {
+    @apply bg-gray-200 text-gray-900;
+  }
+
+  .text-white {
+    @apply text-gray-900;
+  }
+
+  .text-white\/70 {
+    @apply text-gray-600;
+  }
+
+  .text-white\/80 {
+    @apply text-gray-700;
+  }
+
+  .border-white\/10 {
+    @apply border-gray-300;
+  }
+
+  .border-white\/20 {
+    @apply border-gray-400;
   }
 }

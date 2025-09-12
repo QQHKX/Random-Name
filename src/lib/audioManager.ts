@@ -343,29 +343,13 @@ function tick(intensity: number = 1, frequency: number = 1) {
 
 /**
  * 开箱解锁音效：使用CSGO开箱解锁声
- * @returns Promise<void> 音效播放完成后resolve
  */
-function unlock(): Promise<void> {
-  return new Promise((resolve) => {
-    try {
-      const sfx = getSfx('case_unlock', '/audio/sfx/case_unlock.wav')
-      sfx.volume(sfxVolume * masterVolume)
-      const soundId = sfx.play()
-      
-      // 监听音效播放结束
-      sfx.on('end', () => {
-        resolve()
-      }, soundId)
-      
-      // 兜底：如果音效加载失败或其他问题，2秒后强制resolve
-      setTimeout(() => {
-        resolve()
-      }, 2000)
-    } catch (e) {
-      console.warn('Failed to play unlock SFX:', e)
-      resolve()
-    }
-  })
+/**
+ * 开锁音效：已禁用
+ */
+function unlock() {
+  // 开锁音效已被禁用
+  // playSfx('case_unlock', '/audio/sfx/case_unlock.wav')
 }
 
 /**

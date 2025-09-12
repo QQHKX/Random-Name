@@ -43,8 +43,6 @@ function App() {
   const [opening, setOpening] = useState(false)
   const [rollItems, setRollItems] = useState<{ id: string; name: string; rarity: Rarity }[] | null>(null)
   const [targetIndex, setTargetIndex] = useState(0)
-  // 控制轮播动画开始时机
-  const [startAnimation, setStartAnimation] = useState(false)
   // 揭晓后居中放大展示开关
   const [revealOpen, setRevealOpen] = useState(false)
   const [audioStatus, setAudioStatus] = useState(() => sfx.getCacheStatus())
@@ -100,7 +98,7 @@ function App() {
     const onFirstUserGesture = async () => {
       window.removeEventListener('pointerdown', onFirstUserGesture)
       try {
-        await sfx.unlockAudio()
+        await sfx.unlock()
         sfx.playBgm()
         sfx.fadeBgmTo(settings.bgmVolume, 600)
       } catch {}
@@ -113,7 +111,6 @@ function App() {
    * 触发一次抽取流程
    * - 检查音频是否就绪
    * - 播放点击音效
-   * - 播放开锁音效并等待完成
    * - 调用 drawNext 更新全局状态（lastResult、selectedStudent 等）
    * - 使用全局状态中的 selectedStudent 构建滚动序列
    * - 动画联动：滚动开始时轻压 BGM，揭晓后恢复
@@ -138,35 +135,24 @@ function App() {
     // 点击音效
     sfx.click()
 
-    setStartAnimation(false) // 重置动画状态
+    // 滚动阶段：稍微降低 BGM（避免与滴答冲突）
+    sfx.fadeBgmTo(Math.max(0, settings.bgmVolume * 0.6), 300)
+
+    setOpening(true)
 
     // 先计算结果，但暂不展示，拿到结果后构建滚动序列
     const result = drawNext()
     if (!result) {
+      setOpening(false)
+      // 恢复 BGM 音量
+      sfx.fadeBgmTo(settings.bgmVolume, 300)
       return
     }
 
     // 使用 store 中的 selectedStudent（drawNext 已设置）
     const student = useAppStore.getState().selectedStudent
     const finalName = student?.name || 'Unknown'
-    
-    // 先构建序列但不开始动画
     buildSequence(finalName, result.rarity)
-
-    // 播放开锁音效并等待完成
-    try {
-      await sfx.unlock()
-    } catch (e) {
-      console.warn('开锁音效播放失败:', e)
-    }
-
-    // 开锁音效完成后，显示轮盘并开始滚动动画
-    setOpening(true)
-    // 滚动阶段：稍微降低 BGM（避免与滴答冲突）
-    sfx.fadeBgmTo(Math.max(0, settings.bgmVolume * 0.6), 300)
-    
-    // 启动轮播动画
-    setStartAnimation(true)
   }
 
 
@@ -221,7 +207,7 @@ function App() {
   return (
     <div className="min-h-screen w-full bg-[var(--csgo-bg)] text-white flex items-center justify-center">
       {/* 左侧：已抽取名单（仅在不重复模式显示，且大屏显示，动画结束后才显示避免透露结果） */}
-      {settings.noRepeat && drawnStudents.length > 0 && !opening && !rollItems && (
+      {settings.noRepeat && drawnStudents.length > 0 && !opening && (
         <div className="hidden lg:block fixed left-4 top-1/2 -translate-y-1/2 z-30 w-48 max-h-[80vh] overflow-y-auto">
           <div className="p-3 rounded-xl border border-white/10 bg-[var(--csgo-panel)]/70 backdrop-blur-sm shadow-[0_0_24px_rgba(0,162,255,0.12)]">
             <div className="mb-2 text-sm font-semibold opacity-90">已抽取（{drawnStudents.length}/{roster.length}）</div>
@@ -242,7 +228,7 @@ function App() {
           <div>
             <h1 className="text-3xl font-bold tracking-wide">Roll Call</h1>
           </div>
-          <button className="px-3 py-1.5 rounded-md bg-zinc-700 hover:bg-zinc-600 border border-white/10 text-xs" onClick={() => setOpenSettings(true)}>
+          <button className="px-3 py-1.5 rounded-md bg-zinc-700 hover:bg-zinc-600 border border-white/10 text-xs" onClick={() => { sfx.click(); setOpenSettings(true); }}>
             设置
           </button>
         </div>
@@ -281,7 +267,6 @@ function App() {
                 items={rollItems}
                 targetIndex={targetIndex}
                 speed={settings.speed}
-                startAnimation={startAnimation}
                 onComplete={() => {
                   // 揭晓音效
                   const r = useAppStore.getState().lastResult
@@ -294,8 +279,6 @@ function App() {
                   // 开启"居中放大"结果展示，改为点击关闭（无限展示）
                   setRevealOpen(true)
                   // 删除自动关闭逻辑
-                  // 重置动画状态
-                  setStartAnimation(false)
                 }}
               />
             )}
@@ -307,7 +290,7 @@ function App() {
           <button className="px-6 py-3 rounded-lg bg-[var(--csgo-blue)] hover:bg-sky-500 transition-colors font-semibold shadow-lg disabled:opacity-50 disabled:cursor-not-allowed" onClick={handleDraw} disabled={roster.length === 0 || opening}>
             {opening ? '抽取中…' : '开始抽取'}
           </button>
-          <button className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 border border-amber-300/30 text-sm font-medium transition-colors" onClick={resetPool} disabled={roster.length === 0} title="重置抽取池">
+          <button className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 border border-amber-300/30 text-sm font-medium transition-colors" onClick={() => { sfx.click(); resetPool(); }} disabled={roster.length === 0} title="重置抽取池">
             重置抽取池
           </button>
         </div>
