@@ -124,7 +124,7 @@ export default function ResultScreen({
               </motion.div>
 
               {/* 装饰边框 */}
-              <div className="absolute -inset-8 border border-yellow-500/20 rounded-2xl pointer-events-none">
+              <div className="absolute -inset-26 border border-yellow-500/20 rounded-2xl pointer-events-none">
                 {/* 四角光效 */}
                 <div className="absolute -top-1 -left-1 w-4 h-4 bg-yellow-400/50 rounded-full blur-sm"></div>
                 <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400/50 rounded-full blur-sm"></div>
@@ -138,7 +138,7 @@ export default function ResultScreen({
               initial={{ y: 30, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               transition={{ delay: 0.7, duration: 0.5 }}
-              className="absolute bottom-0 left-0 right-0 flex justify-center py-4"
+              className="absolute bottom-0 left-0 right-0 flex justify-center py-2"
             >
               <CompletionMenu
                 onContinue={onContinue}
