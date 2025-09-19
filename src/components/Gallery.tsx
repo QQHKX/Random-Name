@@ -66,6 +66,18 @@ function formatTime(ts: number): string {
 }
 
 /**
+ * 根据历史记录和 roster 生成安全的显示名称
+ * - 优先使用历史记录中的 name，确保与当时抽取结果一致
+ * - 回退到 roster 中的姓名（若历史数据缺失 name）
+ * - 最终回退到 'Unknown'
+ */
+function safeDisplayName(studentId: string, historyName: string | undefined, roster: { id: string, name: string }[]): string {
+  if (historyName && historyName.trim().length > 0) return historyName
+  const rosterMap = new Map(roster.map(s => [s.id, s]))
+  return rosterMap.get(studentId)?.name ?? 'Unknown'
+}
+
+/**
  * 收藏馆组件
  * 显示历史抽奖记录，支持搜索和排序功能
  * @param props 组件属性
@@ -86,7 +98,7 @@ const Gallery = forwardRef<HTMLDivElement, GalleryProps>(({ className = '' }, re
    */
   const visibleRecords = useMemo(() => {
     const q = query.trim().toLowerCase()
-    const base = q ? history.filter(h => h.name.toLowerCase().includes(q)) : history.slice()
+    const base = q ? history.filter(h => safeDisplayName(h.studentId, h.name, roster).toLowerCase().includes(q)) : history.slice()
     base.sort((a, b) => {
       let cmp = 0
       if (sortKey === 'time') {
@@ -100,7 +112,7 @@ const Gallery = forwardRef<HTMLDivElement, GalleryProps>(({ className = '' }, re
       return sortOrder === 'asc' ? cmp : -cmp
     })
     return base
-  }, [history, query, sortKey, sortOrder])
+  }, [history, query, sortKey, sortOrder, roster])
 
   return (
     <div ref={ref} className={`max-w-[980px] mx-auto px-4 md:px-0 pb-12 ${className}`}>
@@ -141,45 +153,38 @@ const Gallery = forwardRef<HTMLDivElement, GalleryProps>(({ className = '' }, re
 
       {/* 网格卡片 */}
       <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {visibleRecords.map((r) => (
-          <div
-            key={`${r.id}-${r.timestamp}`}
-            className="rounded-xl border border-white/10 p-3 bg-black/20 shadow-md hover:shadow-lg transition-shadow"
-            style={{ background: rarityBg(r.rarity) }}
-            title={`${r.name} @ ${formatTime(r.timestamp)}`}
-          >
-            <div className="flex items-center gap-2 mb-2">
-              <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-sm font-bold text-white/90">
-                {/* 安全首字母显示：优先历史记录中的 name，回退到 roster 中的姓名，再回退 '?' */}
-                {(() => {
-                  const rosterMap = new Map(roster.map(s => [s.id, s]))
-                  const displayName = r.name ?? rosterMap.get(r.studentId)?.name ?? 'Unknown'
-                  const initial = (displayName && displayName.length > 0) ? displayName.charAt(0).toUpperCase() : '?'
-                  return initial
-                })()}
+        {visibleRecords.map((r) => {
+          const displayName = safeDisplayName(r.studentId, r.name, roster)
+          const initial = displayName.length > 0 ? displayName.charAt(0).toUpperCase() : '?'
+          return (
+            <div
+              key={`${r.id}-${r.timestamp}`}
+              className="rounded-xl border border-white/10 p-3 bg-black/20 shadow-md hover:shadow-lg transition-shadow"
+              style={{ background: rarityBg(r.rarity) }}
+              title={`${displayName} @ ${formatTime(r.timestamp)}`}
+            >
+              <div className="flex items-center gap-2 mb-2">
+                <div className="w-8 h-8 rounded-full bg-white/10 flex items-center justify-center text-sm font-bold text-white/90">
+                  {initial}
+                </div>
+                <div className="font-semibold truncate" title={displayName}>{displayName}</div>
               </div>
-              {/* 显示安全的名称 */}
-              {(() => {
-                const rosterMap = new Map(roster.map(s => [s.id, s]))
-                const displayName = r.name ?? rosterMap.get(r.studentId)?.name ?? 'Unknown'
-                return <div className="font-semibold truncate" title={displayName}>{displayName}</div>
-              })()}
+              <div className="text-[10px] opacity-80 mb-1">稀有度：{rarityLabelCN(r.rarity)}</div>
+              <div className="text-[10px] opacity-80">磨损：
+                {(() => {
+                  const wl = (r.wearLevel ?? drawWearLevel())
+                  const info = getWearLevelInfo(wl)
+                  return (
+                    <span className="ml-1 font-medium" style={{ color: info.color }}>
+                      {info.label}
+                    </span>
+                  )
+                })()}
+                <span className="ml-1 opacity-70">({(r.wearValue ?? 0).toFixed(4)})</span>
+              </div>
             </div>
-            <div className="text-[10px] opacity-80 mb-1">稀有度：{rarityLabelCN(r.rarity)}</div>
-            <div className="text-[10px] opacity-80">磨损：
-              {(() => {
-                const wl = (r.wearLevel ?? drawWearLevel())
-                const info = getWearLevelInfo(wl)
-                return (
-                  <span className="ml-1 font-medium" style={{ color: info.color }}>
-                    {info.label}
-                  </span>
-                )
-              })()}
-              <span className="ml-1 opacity-70">({(r.wearValue ?? 0).toFixed(4)})</span>
-            </div>
-          </div>
-        ))}
+          )
+        })}
       </div>
     </div>
   )

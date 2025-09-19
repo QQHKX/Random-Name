@@ -14,6 +14,10 @@ interface ResultCardProps {
     rarity: Rarity
     wearLevel?: any
     wearValue?: number
+    /**
+     * 中奖者姓名（来自持久化的 lastResult，作为结果展示的唯一真相来源）
+     */
+    name?: string
   } | null
   /** 点击卡片时的回调函数 */
   onClick?: (e: React.MouseEvent) => void
@@ -54,6 +58,7 @@ export function rarityLabelCN(r: Rarity): string {
 /**
  * 结果卡片组件
  * 显示抽取结果的卡片，包含学生信息、稀有度、磨损等信息
+ * - 姓名展示采用 lastResult.name 作为唯一真相来源，确保与动画页（finalName）和历史存储（history[].name）一致
  */
 const ResultCard: React.FC<ResultCardProps> = ({ selectedStudent, lastResult, onClick }) => {
   // 如果数据不完整，显示加载状态
@@ -72,6 +77,10 @@ const ResultCard: React.FC<ResultCardProps> = ({ selectedStudent, lastResult, on
       </motion.div>
     )
   }
+
+  // 统一的展示姓名：优先 lastResult.name（来自存储），回退 selectedStudent.name，最终回退 "Unknown"
+  const displayName = (lastResult?.name as string | undefined) ?? selectedStudent?.name ?? 'Unknown'
+  const displayInitial = displayName.length > 0 ? displayName.charAt(0).toUpperCase() : '?'
 
   return (
     <motion.div
@@ -112,10 +121,10 @@ const ResultCard: React.FC<ResultCardProps> = ({ selectedStudent, lastResult, on
         )}
 
         <div className="w-20 h-20 rounded-full bg-white/10 flex items-center justify-center text-2xl font-bold text-white/90 flex-shrink-0">
-          {selectedStudent.name.charAt(0).toUpperCase()}
+          {displayInitial}
         </div>
         <div className="text-left flex-1 flex flex-col justify-center">
-          <div className="text-3xl font-bold tracking-wide mb-1">{selectedStudent?.name ?? 'Unknown'}</div>
+          <div className="text-3xl font-bold tracking-wide mb-1">{displayName}</div>
           <div className="text-sm opacity-90 mb-2">稀有度：{rarityLabelCN(lastResult.rarity)}</div>
           <div className="text-[10px] text-white/60 whitespace-nowrap truncate">
             磨损：
