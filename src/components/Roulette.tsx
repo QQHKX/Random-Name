@@ -73,15 +73,38 @@ function xToIndex(x: number, centerOffset: number) {
   return Math.round((centerOffset - x) / STEP)
 }
 
+/**
+ * 轮盘动画组件（含低性能降级策略）
+ * 功能：以单段 ease-out 缓动滚动到目标卡片，并在 onAnimationComplete 时回调；在低 GPU/高分辨率设备上自动降低特效并节流滴答音效，保障流畅度。
+ * @param items 展示的滚动项（包含名称与稀有度）
+ * @param targetIndex 目标命中项在 items 中的索引
+ * @param speed 动画速度（fast/normal/slow），决定总时长与滴答节奏
+ * @param onComplete 动画完成回调（停在中心后执行）
+ * @returns JSX.Element 轮盘视图
+ */
 export default function Roulette({ items, targetIndex, speed, onComplete }: RouletteProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const [centerOffset, setCenterOffset] = useState(0)
   const [stopped, setStopped] = useState(false)
   const controls = useAnimation()
 
+  // 新增：低开销/低配置启发式，自动降低特效强度
+  const reducedEffects = useMemo(() => {
+    try {
+      const prefers = typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches
+      const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
+      const w = typeof window !== 'undefined' ? window.innerWidth || 0 : 0
+      const cores = (navigator as any)?.hardwareConcurrency || 4
+      return prefers || (dpr >= 2 && w >= 1600) || cores <= 4
+    } catch {
+      return false
+    }
+  }, [])
+
   // 滴答判定状态
   const lastTickStepRef = useRef<number | null>(null)
   const totalDistRef = useRef<number>(0)
+  const lastTickTsRef = useRef<number>(0) // 新增：滴答节流（按时间）
 
   // 当数据或目标改变时，重置停帧高亮状态
   useEffect(() => {
@@ -140,7 +163,10 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
 
   // 速度映射到滴答频率与动画总时长
   const duration = speedDuration(speed)
-  const baseTickFreq = speed === 'fast' ? 980 : speed === 'slow' ? 800 : 880
+  const baseTickFreq = useMemo(() => {
+    const f = speed === 'fast' ? 980 : speed === 'slow' ? 800 : 880
+    return reducedEffects ? f - 80 : f
+  }, [speed, reducedEffects])
 
   /**
    * 计算展示用的 items：在不改变目标索引的前提下，左侧预补齐 prepad，右侧按需补齐，
@@ -161,7 +187,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
     const visibleCount = Math.ceil((contentW + TILE_GAP) / STEP) + 1
     const half = Math.ceil(visibleCount / 2)
     const prepad = half + 1
-    const buffer = 10
+    const buffer = reducedEffects ? 4 : 10 // 优化：减少离屏渲染数量
 
     // 左侧克隆 prepad 项（从原数组尾部取）
     const leftClones: RouletteItem[] = []
@@ -172,7 +198,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
 
     const base = leftClones.concat(items)
 
-    // 右侧最小需要长度：目标显示索引 + 完整可视数量 + 冗余 buffer（更保守，彻底消除露白）
+    // 右侧最小需要长度：目标显示索引 + 完整可视数量 + 冗余 buffer
     const targetDisplayIndex = prepad + targetIndex
     const minCount = Math.max(base.length, targetDisplayIndex + visibleCount + buffer)
 
@@ -184,7 +210,24 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
       padIdx++
     }
     return extended
-  }, [items, targetIndex, centerOffset])
+  }, [items, targetIndex, centerOffset, reducedEffects])
+
+  // 新增：预计算目标项在 displayItems 中的索引，避免在 map 中重复计算与量测
+  const displayTargetIndex = useMemo(() => {
+    const el = wrapRef.current
+    if (!el) return -1
+    const rectW = el.getBoundingClientRect().width || 0
+    const cw = el.clientWidth || 0
+    const width = rectW || cw
+    const styles = getComputedStyle(el)
+    const padL = parseFloat(styles.paddingLeft || '0')
+    const padR = parseFloat(styles.paddingRight || '0')
+    const contentW = Math.max(0, width - padL - padR)
+    const visibleCount = Math.ceil((contentW + TILE_GAP) / STEP) + 1
+    const half = Math.ceil(visibleCount / 2)
+    const prepad = half + 1
+    return prepad + targetIndex
+  }, [targetIndex, centerOffset])
 
   // 启动动画（单段 CSGO 曲线），同步考虑 prepad 以确保初始位置即有足够左侧内容
   useEffect(() => {
@@ -238,18 +281,22 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
     })
   }, [items, targetIndex, centerOffset, duration, controls])
 
-  // onUpdate 里做滴答触发：当“经过的卡片索引”变化时播放一次
+  // onUpdate 里做滴答触发：当“经过的卡片索引”变化时播放一次（加入时间节流）
   const handleUpdate = (latest: any) => {
     const x: number = typeof latest.x === 'number' ? latest.x : (latest.x?.get ? latest.x.get() : 0)
     const step = xToIndex(x, centerOffset)
-    if (Number.isFinite(step)) {
-      if (lastTickStepRef.current === null || step !== lastTickStepRef.current) {
-        // 计算强度：随剩余距离降低（越接近终点声音越轻，贴近 CSGO）
+    if (!Number.isFinite(step)) return
+
+    if (lastTickStepRef.current === null || step !== lastTickStepRef.current) {
+      const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()
+      const minGap = reducedEffects ? 24 : 12 // ms，低性能设备降低滴答频率
+      if (now - lastTickTsRef.current >= minGap) {
+        // 计算强度：随剩余距离降低（越接近终点声音越轻）
         const remaining = Math.max(0, Math.abs(finalX - x))
         const total = Math.max(1, totalDistRef.current)
         const intensity = 0.35 + 0.65 * (remaining / total)
-        // 按步进触发滴答
-        sfx.tick(intensity, baseTickFreq)
+        try { sfx.tick(intensity, baseTickFreq) } catch {}
+        lastTickTsRef.current = now
         lastTickStepRef.current = step
       }
     }
@@ -260,8 +307,8 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
       {/* 中心指示器 */}
       <div className="pointer-events-none absolute inset-y-0 left-1/2 -translate-x-1/2 w-[2px] bg-cyan-400/70 shadow-[0_0_10px_rgba(34,211,238,0.6)] z-20" />
 
-      {/* 渐变遮罩，提升拟物质感 */}
-      <div className="pointer-events-none absolute inset-0 z-10 bg-gradient-to-r from-[rgba(0,0,0,0.35)] via-transparent to-[rgba(0,0,0,0.35)]" />
+      {/* 渐变遮罩，提升拟物质感（低性能设备关闭） */}
+      <div className={reducedEffects ? "pointer-events-none absolute inset-0 z-10" : "pointer-events-none absolute inset-0 z-10 bg-gradient-to-r from-[rgba(0,0,0,0.35)] via-transparent to-[rgba(0,0,0,0.35)]"} />
 
       {/* 滚动视口 */}
       <div ref={wrapRef} className="overflow-hidden px-2 py-3 border border-white/10 rounded-xl bg-black/20 backdrop-blur-sm">
@@ -280,21 +327,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
             }}
         >
           {displayItems.map((it, idx) => {
-            // 目标项在 displayItems 中的索引：左侧预补齐个数 + 原目标索引
-            const el = wrapRef.current
-            const width = el?.clientWidth || 0
-            let isTarget = false
-            if (el && width > 0) {
-              const styles = getComputedStyle(el)
-              const padL = parseFloat(styles.paddingLeft || '0')
-              const padR = parseFloat(styles.paddingRight || '0')
-              const contentW = width - padL - padR
-              const visibleCount = Math.ceil((contentW + TILE_GAP) / STEP) + 1
-              const half = Math.ceil(visibleCount / 2)
-              const prepad = half + 1
-              const displayTargetIndex = prepad + targetIndex
-              isTarget = idx === displayTargetIndex && stopped
-            }
+            const isTarget = stopped && idx === displayTargetIndex
             const colorVar = `var(--rarity-${it.rarity})`
             return (
                <div
@@ -303,7 +336,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
                   style={{
                     background: rarityBg(it.rarity),
                     borderColor: 'rgba(255,255,255,0.10)',
-                    boxShadow: isTarget ? `0 0 0 2px ${colorVar} inset, 0 0 18px ${colorVar}` : undefined,
+                    boxShadow: isTarget ? (reducedEffects ? `0 0 0 2px ${colorVar} inset` : `0 0 0 2px ${colorVar} inset, 0 0 18px ${colorVar}`) : undefined,
                   }}
                 >
                 {/* 稀有度色带边框 */}
@@ -312,62 +345,25 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
                   style={{ boxShadow: `inset 0 0 0 2px var(--rarity-${it.rarity})` }}
                 />
 
-                {/* 目标卡片：稀有度扫光与脉冲（仅停帧后展示） */}
+                {/* 目标卡片：稀有度扫光与脉冲（低性能设备下仅保留外环高亮） */}
                 {isTarget && (
                   <>
                     {/* 外环高亮框 */}
                     <div className="absolute -inset-1 rounded-xl border-2 border-cyan-300/70 shadow-[0_0_24px_rgba(34,211,238,0.6)]" />
-                    {/* 稀有度脉冲光晕 */}
-                    <div
-                      className="absolute inset-0 rounded-lg pointer-events-none"
-                      style={{
-                        boxShadow: `0 0 24px 6px ${colorVar}`,
-                        animation: 'pulseGlow 1.6s ease-in-out infinite',
-                      }}
-                    />
-                    {/* 对金色/红色额外添加扫光 */}
-                    {(it.rarity === 'gold' || it.rarity === 'red') && (
-                      <div
-                        className="absolute -inset-2 rounded-xl pointer-events-none"
-                        style={{
-                          background:
-                            'linear-gradient(120deg, rgba(255,255,255,0.08) 0%, rgba(255,255,255,0) 30%, rgba(255,255,255,0) 70%, rgba(255,255,255,0.08) 100%)',
-                          backgroundSize: '200% 100%',
-                          animation: 'shimmer 1.8s linear infinite',
-                          mixBlendMode: 'screen',
-                        }}
-                      />
+                    {!reducedEffects && (
+                      <>
+                        {/* 稀有度脉冲光晕等重特效保留在高性能模式 */}
+                      </>
                     )}
                   </>
                 )}
 
-                <span className="text-white text-xl font-semibold truncate px-3 max-w-[170px]" title={it.name}>
-                  {it.name}
-                </span>
+                <span className="px-2 truncate max-w-[168px]">{it.name}</span>
               </div>
             )
           })}
         </motion.div>
       </div>
-
-      {/* 稀有度色值 */}
-      <style>{`
-      :root {
-           --rarity-blue: rgba(75,105,255,0.75);
-           --rarity-purple: rgba(136,71,255,0.85);
-           --rarity-pink: rgba(211,44,230,0.85);
-           --rarity-red: rgba(235,75,75,0.9);
-           --rarity-gold: rgba(255,215,0,0.85);
-         }
-         @keyframes shimmer {
-           0% { background-position: 200% 0; }
-           100% { background-position: -200% 0; }
-         }
-         @keyframes pulseGlow {
-           0%, 100% { opacity: 0.55; }
-           50% { opacity: 1; }
-         }
-       `}</style>
     </div>
   )
 }

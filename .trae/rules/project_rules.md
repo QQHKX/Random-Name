@@ -77,6 +77,15 @@
 - 代码与注释使用中文
 - 提交信息使用中文，清晰描述变更
 
+## 十四、版本发布规范
+- 版本号遵循语义化版本规范（主版本.次版本.修订版本）
+- 每次发布前必须更新package.json版本号
+- README.md中必须包含详细的更新日志
+- 重大功能更新应升级主版本号（1.x.x → 2.0.0）
+- 向后兼容的功能性更新升级次版本号（2.1.x → 2.2.0）
+- 问题修复和性能优化升级修订版本号（2.2.0 → 2.2.1）
+- 发布前需进行完整的测试验证
+
 ## 十二、实现约定与落地细则（新增）
 - 所有组件与导出函数需添加中文 JSDoc：功能说明、参数、返回值，且函数级注释与类型定义必须到位。
 - SettingsModal 必须通过 store 方法进行设置写回：setClassName、toggleNoRepeat、setSpeed、setVolumes。
@@ -87,3 +96,12 @@
 - 不重复模式：toggleNoRepeat(true) 时构建 pool；toggleNoRepeat(false) 时清空 pool；hydrate 后若 noRepeat=true 且 pool 为空则 resetPool。
 - 资源目录：public/audio 放置 bgm 与 sfx；命名遵循小写连字符；SVG 用于矢量图标与占位。
 - 名单加载入口统一在 SettingsModal：主页仅保留“重置抽取池”按钮；Settings 中提供“导入示例名单（MD.csv/MD.xlsx）”与“重新读取 MD.csv（跳过缓存）”。
+
+## 十三、性能优化（轮盘动画）
+- 渲染数量控制：基于容器宽度动态计算可见项，左侧 prepad + 右侧最小补齐，低性能模式 buffer=4，高性能 buffer=10。
+- 低性能降级：根据 prefers-reduced-motion、DPR≥2 且宽≥1600、CPU 核心数≤4 启动 reducedEffects，关闭/降低渐变遮罩、阴影与重特效。
+- 滴答节流：按“卡片步进变化”触发且增加最小间隔（低性能 24ms，正常 12ms），强度随剩余距离线性衰减。
+- 计算去重：预计算 displayTargetIndex，避免在 map 渲染中读取布局与重复计算。
+- 动画参数：单段 cubic-bezier(0.22, 1, 0.36, 1) 缓动，按 settings.speed 映射总时长与滴答频率。
+- 样式变量：稀有度颜色通过 src/index.css 的 CSS 变量提供，禁止在组件内重复声明。
+- 事件与状态：在 onAnimationComplete 中统一 setStopped 与对齐 finalX，避免浮点误差造成的重排。
