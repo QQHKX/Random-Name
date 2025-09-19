@@ -8,6 +8,10 @@ import { sfx } from '../lib/audioManager'
  * - 接收一组 items（包含姓名与稀有度），以及目标索引 targetIndex
  * - 根据 speed 计算滚动时长，采用单段 CSGO 风格的强减速 cubic-bezier(0.22, 1, 0.36, 1)
  * - 在滚动过程中按卡片经过中心触发滴答声；到达终点后，对目标卡片做“停帧高亮”并触发 onComplete
+ * @param props.items 待渲染的滚动项
+ * @param props.targetIndex 目标项在 items 中的索引（最终停在中心指示线）
+ * @param props.speed 动画速度档位
+ * @param props.onComplete 动画完成后的回调
  */
 export interface RouletteItem {
   id: string
@@ -61,7 +65,8 @@ function speedDuration(speed: RouletteProps['speed']) {
 /**
  * 将当前 X 位置映射为“中心经过的卡片索引”，用于滴答触发
  * @param x 当前 translateX 像素
- * @param centerOffset 中心补偿
+ * @param centerOffset 中心补偿偏移
+ * @returns 经过中心的卡片索引（四舍五入到最接近的卡片）
  */
 function xToIndex(x: number, centerOffset: number) {
   // 当某卡片中心与容器中心重合时，有 centerOffset - x ≈ idx * STEP
@@ -107,12 +112,8 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
     // 容器中心的位置（相对于容器左边缘）
     const containerCenter = padL + contentW / 2
     
-    // 添加随机偏移，让停止位置不总是精确在中心
-    // 偏移范围：-15px 到 +15px，确保目标卡片仍然可见
-    const randomOffset = (Math.random() - 0.5) * 30
-    
-    // 需要的translateX值：让目标卡片中心对齐到容器中心（加上随机偏移）
-    return containerCenter - targetCenter + randomOffset
+    // 修复：为确保指针所指即为抽取结果，移除随机偏移，精确对齐目标卡片中心到容器中心
+    return containerCenter - targetCenter
   }, [targetIndex, centerOffset])
 
   // 初次渲染与窗口大小变化时，计算中心偏移
