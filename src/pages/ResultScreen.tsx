@@ -5,6 +5,7 @@ import type { Student, RollResult } from '../store/appStore'
 
 /**
  * ResultScreen 页面组件属性接口
+ * - 新增 lockClose/autoRolling/progressText 用于 5 连抽期间防误触
  */
 interface ResultScreenProps {
   /** 是否显示结果界面 */
@@ -15,8 +16,14 @@ interface ResultScreenProps {
   selectedStudent: Student | null
   /** 继续抽奖回调 */
   onContinue: () => void
-  /** 返回主界面回调 */
+  /** 返回主界面回调（关闭） */
   onClose: () => void
+  /** 连抽时锁定关闭（屏蔽点击遮罩关闭、隐藏关闭按钮） */
+  lockClose?: boolean
+  /** 是否处于自动连抽中（禁用继续按钮并显示进度） */
+  autoRolling?: boolean
+  /** 进度提示文案（例如："自动连抽中 · 第 2/5 次"） */
+  progressText?: string
 }
 
 /**
@@ -30,8 +37,24 @@ export default function ResultScreen({
   lastResult,
   selectedStudent,
   onContinue,
-  onClose
+  onClose,
+  lockClose = false,
+  autoRolling = false,
+  progressText
 }: ResultScreenProps) {
+  /**
+   * 处理点击遮罩的行为：在锁定关闭时不执行关闭，防止误触
+   * @param e 鼠标事件
+   */
+  const handleOverlayClick = (e: React.MouseEvent) => {
+    if (lockClose) {
+      // 锁定模式下阻止事件继续冒泡与默认关闭逻辑
+      e.stopPropagation()
+      return
+    }
+    onClose()
+  }
+
   return (
     <AnimatePresence>
       {isOpen && lastResult && selectedStudent && (
@@ -41,7 +64,7 @@ export default function ResultScreen({
           exit={{ opacity: 0 }}
           transition={{ duration: 0.3 }}
           className="fixed inset-0 z-50 bg-black/90 backdrop-blur-md"
-          onClick={onClose}
+          onClick={handleOverlayClick}
         >
           {/* 装饰边框 - 带外边距 */}
           <div className="absolute inset-4 border border-yellow-500/20 rounded-lg pointer-events-none">
@@ -144,6 +167,9 @@ export default function ResultScreen({
               <CompletionMenu
                 onContinue={onContinue}
                 onClose={onClose}
+                lockClose={lockClose}
+                autoRolling={autoRolling}
+                progressText={progressText}
               />
             </motion.div>
 

@@ -53,6 +53,11 @@ function App() {
   const [audioStatus, setAudioStatus] = useState(() => sfx.getCacheStatus())
   const galleryRef = useRef<HTMLDivElement | null>(null)
   
+  // 5连抽状态
+  const [isAutoRolling, setIsAutoRolling] = useState(false)
+  const autoRollCountRef = useRef(0)
+  const autoRollTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
   // 计算已抽取学生列表
   const drawnStudents = getDrawnStudents(roster, pool, settings.noRepeat)
   
@@ -109,22 +114,38 @@ function App() {
   }, [settings.bgmVolume])
 
   /**
+   * 根据速度计算在结果页的停留时间（毫秒）
+   * - 目的：5连抽时每次揭晓后给予用户清晰可见的间隔
+   * @returns {number} 停留时间（ms）
+   */
+  function resultPauseMs(): number {
+    switch (settings.speed) {
+      case 'slow':
+        return 1500
+      case 'fast':
+        return 900
+      default:
+        return 1200
+    }
+  }
+
+  /**
    * 触发一次抽取流程
-   * - 检查音频是否就绪
+   * - 检查音频是否就绪（可选择跳过，供自动连抽使用）
    * - 播放点击音效
    * - 调用 drawNext 更新全局状态（lastResult、selectedStudent 等）
    * - 使用全局状态中的 selectedStudent 构建滚动序列
    * - 动画联动：滚动开始时轻压 BGM，揭晓后恢复
+   * @param opts 可选项：skipAudioPrompt 是否跳过音频加载提示（用于自动连抽）
    */
-  const handleDraw = async () => {
+  const handleDraw = async (opts?: { skipAudioPrompt?: boolean }) => {
     if (roster.length === 0) {
       alert('请先导入名单或添加学生。')
       return
     }
 
-    // 检查音频缓存状态
-    if (!audioStatus.loaded && audioStatus.progress < 100) {
-      // 如果音频还在加载中，给用户提示
+    // 检查音频缓存状态（可跳过，用于自动连抽）
+    if (!opts?.skipAudioPrompt && !audioStatus.loaded && audioStatus.progress < 100) {
       const shouldContinue = confirm(
         `音频文件还在加载中（${audioStatus.progress}%），现在抽奖可能没有音效。\n\n是否继续抽奖？`
       )
@@ -148,6 +169,10 @@ function App() {
       setCurrentPage('home')
       // 恢复 BGM 音量
       sfx.fadeBgmTo(settings.bgmVolume, 300)
+      // 若在自动连抽中，遇到无可抽取对象则终止
+      if (isAutoRolling) {
+        setIsAutoRolling(false)
+      }
       return
     }
 
@@ -156,11 +181,39 @@ function App() {
     buildSequence(finalName, result.rarity)
   }
 
+  /**
+   * 发起一次自动连抽的下一次抽取
+   * - 复用 handleDraw（跳过音频提示）
+   * - 若名单为空或出现异常则自动终止
+   */
+  function performNextAutoRoll() {
+    if (roster.length === 0) {
+      setIsAutoRolling(false)
+      return
+    }
+    // 回到主页后再触发下一次抽取，保证页面状态正确
+    setCurrentPage('home')
+    setTimeout(() => {
+      handleDraw({ skipAudioPrompt: true })
+    }, 10)
+  }
 
-
-
-
-
+  /**
+   * 启动 5 连抽
+   * - 自动执行 5 次抽奖：动画 → 揭晓 → 短暂停留 → 下一次
+   * - 期间禁用手动按钮，避免中断
+   */
+  function handleFiveDraws() {
+    if (isAutoRolling) return
+    if (roster.length === 0) {
+      alert('请先导入名单或添加学生。')
+      return
+    }
+    sfx.click()
+    setIsAutoRolling(true)
+    autoRollCountRef.current = 0
+    performNextAutoRoll()
+  }
 
   /**
    * 根据抽取结果构建滚动序列
@@ -233,6 +286,22 @@ function App() {
     // 延迟切换到结果页面，让轮盘退出动画完成（0.4秒）
     setTimeout(() => {
       setCurrentPage('result')
+
+      // 若处于自动连抽：统计次数并在短暂停留后继续下一次
+      if (isAutoRolling) {
+        autoRollCountRef.current += 1
+        const finished = autoRollCountRef.current >= 5
+        if (!finished) {
+          // 在结果页停留一段时间，随后继续下一抽
+          if (autoRollTimerRef.current) clearTimeout(autoRollTimerRef.current)
+          autoRollTimerRef.current = setTimeout(() => {
+            performNextAutoRoll()
+          }, resultPauseMs())
+        } else {
+          // 完成 5 连抽，退出自动模式
+          setIsAutoRolling(false)
+        }
+      }
     }, 10)
   }
 
@@ -257,6 +326,13 @@ function App() {
     sfx.click()
     resetPool()
   }
+
+  // 组件卸载或模式切换时清理定时器
+  useEffect(() => {
+    return () => {
+      if (autoRollTimerRef.current) clearTimeout(autoRollTimerRef.current)
+    }
+  }, [])
 
   return (
     <div className="min-h-screen bg-[var(--csgo-bg)] text-white relative">
@@ -310,26 +386,44 @@ function App() {
                 </div>
 
                 {/* 主控制面板 */}
-                 <div className="w-full max-w-2xl">
-                   <div className="bg-[var(--csgo-panel)]/80 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/10 p-4 lg:p-8 shadow-2xl">
-                     {/* 操作按钮组 */}
-                     <div className="flex flex-col gap-6">
-                       {/* 主要抽取按钮 */}
-                       <button 
-                         className="w-full px-12 py-8 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 hover:border-white/30 transition-all duration-300 font-bold text-white text-xl disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/10 disabled:hover:border-white/20" 
-                         onClick={handleDraw} 
-                         disabled={roster.length === 0 || currentPage !== 'home'}
-                       >
-                         <div className="flex items-center justify-center gap-4">
-                           <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M19 10a9 9 0 11-18 0 9 9 0 0118 0z" />
-                           </svg>
-                           <span>{currentPage !== 'home' ? '抽取中...' : '开始抽取'}</span>
-                         </div>
-                       </button>
-                     </div>
-                   </div>
-                 </div>
+                <div className="w-full max-w-2xl">
+                  <div className="bg-[var(--csgo-panel)]/80 backdrop-blur-xl rounded-2xl lg:rounded-3xl border border-white/10 p-4 lg:p-8 shadow-2xl">
+                    {/* 操作按钮组 */}
+                    <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-stretch">
+                      {/* 主要抽取按钮 */}
+                      <button 
+                        className="w-full h-full md:col-span-3 px-12 py-8 rounded-2xl bg-white/10 hover:bg-white/15 border border-white/20 hover:border-white/30 transition-all duration-300 font-bold text-white text-xl disabled:opacity-40 disabled:cursor-not-allowed disabled:hover:bg-white/10 disabled:hover:border-white/20" 
+                        onClick={() => handleDraw()} 
+                        disabled={roster.length === 0 || currentPage !== 'home' || isAutoRolling}
+                      >
+                        <div className="flex items-center justify-center gap-4">
+                          <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.828 14.828a4 4 0 01-5.656 0M9 10h1m4 0h1m-6 4h.01M19 10a9 9 0 11-18 0 9 9 0 0118 0z" />
+                          </svg>
+                          <span>{currentPage !== 'home' ? '抽取中...' : '开始抽取'}</span>
+                        </div>
+                      </button>
+                      
+                      {/* 5 连抽按钮 */}
+                      <button 
+                        className="w-full h-full md:col-span-1 px-12 py-8 rounded-2xl bg-[var(--csgo-blue)]/15 hover:bg-[var(--csgo-blue)]/20 border border-white/15 hover:border-white/25 transition-all duration-300 font-bold text-white text-xl disabled:opacity-40 disabled:cursor-not-allowed"
+                        onClick={handleFiveDraws}
+                        disabled={roster.length === 0 || currentPage !== 'home' || isAutoRolling}
+                        title="自动执行 5 次抽奖（动画与结果会逐一展示）"
+                      >
+                        <div className="flex items-center justify-center gap-3">
+                          <svg className="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2m6-2a10 10 0 11-20 0 10 10 0 0120 0z" />
+                          </svg>
+                          <span>5 连抽</span>
+                          {isAutoRolling && (
+                            <span className="text-white/70 text-sm">(第 {autoRollCountRef.current + 1} 次)</span>
+                          )}
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </motion.div>
 
@@ -384,6 +478,9 @@ function App() {
         selectedStudent={selectedStudent || null}
         onContinue={handleContinue}
         onClose={handleCloseResult}
+        lockClose={isAutoRolling}
+        autoRolling={isAutoRolling}
+        progressText={isAutoRolling ? `自动连抽中 · 第 ${Math.min(autoRollCountRef.current, 5)}/5 次` : undefined}
       />
 
       {/* 页脚组件 */}
