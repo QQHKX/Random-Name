@@ -14,6 +14,20 @@ interface GalleryProps {
 }
 
 /**
+ * 排序条件类型
+ */
+type SortKey = 'time' | 'rarity' | 'wear' | 'name'
+
+/**
+ * 排序规则接口
+ */
+interface SortRule {
+  key: SortKey
+  order: 'asc' | 'desc'
+  priority: number // 优先级，数字越小优先级越高
+}
+
+/**
  * 将稀有度映射为可比较的权重（值越大稀有度越高）
  * @param r 稀有度键
  * @returns 数值权重
@@ -79,40 +93,135 @@ function safeDisplayName(studentId: string, historyName: string | undefined, ros
 
 /**
  * 收藏馆组件
- * 显示历史抽奖记录，支持搜索和排序功能
+ * 显示历史抽奖记录，支持搜索和多重排序功能
  * @param props 组件属性
  * @returns JSX 元素
  */
 const Gallery = forwardRef<HTMLDivElement, GalleryProps>(({ className = '' }, ref) => {
   const { history, roster } = useAppStore()
   
-  // 收藏馆：搜索与排序控制
+  // 收藏馆：搜索与多重排序控制
   const [query, setQuery] = useState('')
-  const [sortKey, setSortKey] = useState<'time' | 'rarity' | 'wear'>('time')
-  const [sortOrder, setSortOrder] = useState<'desc' | 'asc'>('desc')
+  const [sortRules, setSortRules] = useState<SortRule[]>([
+    { key: 'time', order: 'desc', priority: 1 }
+  ])
+  const [showAdvancedSort, setShowAdvancedSort] = useState(false)
+
+  /**
+   * 添加排序规则
+   * @param key 排序字段
+   * @param order 排序方向
+   */
+  const addSortRule = (key: SortKey, order: 'asc' | 'desc') => {
+    const existingIndex = sortRules.findIndex(rule => rule.key === key)
+    if (existingIndex >= 0) {
+      // 如果已存在该字段，更新排序方向
+      const newRules = [...sortRules]
+      newRules[existingIndex].order = order
+      setSortRules(newRules)
+    } else {
+      // 添加新的排序规则
+      const newRule: SortRule = {
+        key,
+        order,
+        priority: Math.max(...sortRules.map(r => r.priority), 0) + 1
+      }
+      setSortRules([...sortRules, newRule])
+    }
+  }
+
+  /**
+   * 移除排序规则
+   * @param key 要移除的排序字段
+   */
+  const removeSortRule = (key: SortKey) => {
+    setSortRules(sortRules.filter(rule => rule.key !== key))
+  }
+
+  /**
+   * 调整排序规则优先级
+   * @param key 排序字段
+   * @param direction 调整方向
+   */
+  const adjustPriority = (key: SortKey, direction: 'up' | 'down') => {
+    const newRules = [...sortRules]
+    const index = newRules.findIndex(rule => rule.key === key)
+    if (index < 0) return
+
+    if (direction === 'up' && index > 0) {
+      // 与前一个交换优先级
+      const temp = newRules[index].priority
+      newRules[index].priority = newRules[index - 1].priority
+      newRules[index - 1].priority = temp
+      newRules.sort((a, b) => a.priority - b.priority)
+    } else if (direction === 'down' && index < newRules.length - 1) {
+      // 与后一个交换优先级
+      const temp = newRules[index].priority
+      newRules[index].priority = newRules[index + 1].priority
+      newRules[index + 1].priority = temp
+      newRules.sort((a, b) => a.priority - b.priority)
+    }
+    
+    setSortRules(newRules)
+  }
+
+  /**
+   * 重置排序规则为默认状态
+   */
+  const resetSortRules = () => {
+    setSortRules([{ key: 'time', order: 'desc', priority: 1 }])
+  }
   
   /**
-   * 基于搜索与排序规则生成可见的历史记录列表
-   * - 默认时间倒序（最新在前）
-   * - 搜索按姓名包含匹配（不区分大小写）
+   * 过滤和多重排序后的历史记录
    */
-  const visibleRecords = useMemo(() => {
-    const q = query.trim().toLowerCase()
-    const base = q ? history.filter(h => safeDisplayName(h.studentId, h.name, roster).toLowerCase().includes(q)) : history.slice()
-    base.sort((a, b) => {
-      let cmp = 0
-      if (sortKey === 'time') {
-        cmp = a.timestamp - b.timestamp
-      } else if (sortKey === 'rarity') {
-        cmp = rarityOrderValue(a.rarity) - rarityOrderValue(b.rarity)
-      } else {
-        // wear：按等级权重排序（更新 → 更旧）
-        cmp = wearOrderValue(a.wearLevel) - wearOrderValue(b.wearLevel)
-      }
-      return sortOrder === 'asc' ? cmp : -cmp
+  const filteredAndSortedHistory = useMemo(() => {
+    // 过滤
+    let filtered = history.filter(item => {
+      const student = roster.find(s => s.id === item.studentId)
+      const studentName = student?.name || '未知学生'
+      return studentName.toLowerCase().includes(query.toLowerCase())
     })
-    return base
-  }, [history, query, sortKey, sortOrder, roster])
+
+    // 多重排序
+    if (sortRules.length > 0) {
+      filtered.sort((a, b) => {
+        // 按优先级顺序应用排序规则
+        const sortedRules = [...sortRules].sort((x, y) => x.priority - y.priority)
+        
+        for (const rule of sortedRules) {
+          let comparison = 0
+          
+          switch (rule.key) {
+            case 'time':
+              comparison = a.timestamp - b.timestamp
+              break
+            case 'rarity':
+              comparison = rarityOrderValue(a.rarity) - rarityOrderValue(b.rarity)
+              break
+            case 'wear':
+              comparison = wearOrderValue(a.wearLevel) - wearOrderValue(b.wearLevel)
+              break
+            case 'name':
+              const studentA = roster.find(s => s.id === a.studentId)
+              const studentB = roster.find(s => s.id === b.studentId)
+              const nameA = studentA?.name || '未知学生'
+              const nameB = studentB?.name || '未知学生'
+              comparison = nameA.localeCompare(nameB, 'zh-CN')
+              break
+          }
+          
+          if (comparison !== 0) {
+            return rule.order === 'desc' ? -comparison : comparison
+          }
+        }
+        
+        return 0
+      })
+    }
+
+    return filtered
+  }, [history, roster, query, sortRules])
 
   return (
     <div ref={ref} className={`max-w-[980px] mx-auto px-4 md:px-0 pb-12 ${className}`}>
@@ -127,34 +236,162 @@ const Gallery = forwardRef<HTMLDivElement, GalleryProps>(({ className = '' }, re
               placeholder="搜索姓名…"
               className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 placeholder-white/40 focus:outline-none focus:ring-2 focus:ring-sky-500 text-sm"
             />
-            <select
-              value={sortKey}
-              onChange={(e) => setSortKey(e.target.value as any)}
-              className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 text-sm [&>option]:bg-gray-800 [&>option]:text-white"
-              title="排序字段"
+            
+            {/* 统一的排序控制区域 */}
+            {!showAdvancedSort ? (
+              <>
+                <select
+                  value={sortRules[0]?.key || 'time'}
+                  onChange={(e) => {
+                    const key = e.target.value as SortKey
+                    setSortRules([{ key, order: sortRules[0]?.order || 'desc', priority: 1 }])
+                  }}
+                  className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 text-sm [&>option]:bg-gray-800 [&>option]:text-white"
+                  title="排序字段"
+                >
+                  <option value="time">按时间</option>
+                  <option value="rarity">按稀有度</option>
+                  <option value="wear">按磨损</option>
+                  <option value="name">按姓名</option>
+                </select>
+                <select
+                  value={sortRules[0]?.order || 'desc'}
+                  onChange={(e) => {
+                    const order = e.target.value as 'asc' | 'desc'
+                    const key = sortRules[0]?.key || 'time'
+                    setSortRules([{ key, order, priority: 1 }])
+                  }}
+                  className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 text-sm [&>option]:bg-gray-800 [&>option]:text-white"
+                  title="排序方向"
+                >
+                  <option value="desc">倒序</option>
+                  <option value="asc">正序</option>
+                </select>
+              </>
+            ) : (
+              <div className="text-sm text-white/70">
+                多重排序已启用
+              </div>
+            )}
+            
+            <button
+              onClick={() => setShowAdvancedSort(!showAdvancedSort)}
+              className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 text-sm hover:bg-white/20 transition-colors"
+              title={showAdvancedSort ? '切换到简单排序' : '切换到多重排序'}
             >
-              <option value="time">按时间</option>
-              <option value="rarity">按稀有度</option>
-              <option value="wear">按磨损</option>
-            </select>
-            <select
-              value={sortOrder}
-              onChange={(e) => setSortOrder(e.target.value as any)}
-              className="px-3 py-2 rounded-lg bg-white/10 border border-white/15 text-sm [&>option]:bg-gray-800 [&>option]:text-white"
-              title="排序方向"
-            >
-              <option value="desc">倒序</option>
-              <option value="asc">正序</option>
-            </select>
+              {showAdvancedSort ? '简单' : '多重'}
+            </button>
           </div>
         </div>
-        <div className="text-xs opacity-70 mt-1">共 {visibleRecords.length} 条记录，默认按抽中时间倒序</div>
+        
+        {/* 多重排序控制面板 */}
+        {showAdvancedSort && (
+          <div className="mt-3 p-3 rounded-lg bg-white/5 border border-white/10">
+            <div className="flex items-center justify-between mb-3">
+              <div className="text-sm font-medium">排序规则（按优先级顺序）</div>
+              <button
+                onClick={resetSortRules}
+                className="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 transition-colors"
+              >
+                重置
+              </button>
+            </div>
+            
+            {/* 当前排序规则列表 */}
+            <div className="space-y-2 mb-3">
+              {sortRules.map((rule, index) => (
+                <div key={rule.key} className="flex items-center gap-2 p-2 rounded bg-white/5">
+                  <div className="text-xs bg-sky-500/20 text-sky-300 px-2 py-1 rounded">
+                    {index + 1}
+                  </div>
+                  <div className="flex-1 text-sm">
+                    {rule.key === 'time' && '时间'}
+                    {rule.key === 'rarity' && '稀有度'}
+                    {rule.key === 'wear' && '磨损'}
+                    {rule.key === 'name' && '姓名'}
+                    <span className="ml-2 opacity-70">
+                      ({rule.order === 'desc' ? '倒序' : '正序'})
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-1">
+                    <button
+                      onClick={() => adjustPriority(rule.key, 'up')}
+                      disabled={index === 0}
+                      className="text-xs px-1 py-1 rounded hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="提高优先级"
+                    >
+                      ↑
+                    </button>
+                    <button
+                      onClick={() => adjustPriority(rule.key, 'down')}
+                      disabled={index === sortRules.length - 1}
+                      className="text-xs px-1 py-1 rounded hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="降低优先级"
+                    >
+                      ↓
+                    </button>
+                    <button
+                      onClick={() => removeSortRule(rule.key)}
+                      disabled={sortRules.length === 1}
+                      className="text-xs px-2 py-1 rounded hover:bg-red-500/20 text-red-300 disabled:opacity-30 disabled:cursor-not-allowed"
+                      title="移除规则"
+                    >
+                      ×
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+            
+            {/* 添加新排序规则 */}
+            <div className="flex flex-wrap gap-2">
+              {(['time', 'rarity', 'wear', 'name'] as SortKey[]).map(key => {
+                const isActive = sortRules.some(rule => rule.key === key)
+                const labels = { time: '时间', rarity: '稀有度', wear: '磨损', name: '姓名' }
+                
+                return (
+                  <div key={key} className="flex items-center gap-1">
+                    <button
+                      onClick={() => addSortRule(key, 'desc')}
+                      disabled={isActive}
+                      className="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                      title={`按${labels[key]}倒序`}
+                    >
+                      {labels[key]}↓
+                    </button>
+                    <button
+                      onClick={() => addSortRule(key, 'asc')}
+                      disabled={isActive}
+                      className="text-xs px-2 py-1 rounded bg-white/10 hover:bg-white/20 disabled:opacity-30 disabled:cursor-not-allowed"
+                      title={`按${labels[key]}正序`}
+                    >
+                      {labels[key]}↑
+                    </button>
+                  </div>
+                )
+              })}
+            </div>
+          </div>
+        )}
+        
+        <div className="text-xs opacity-70 mt-2">
+          共 {filteredAndSortedHistory.length} 条记录
+          {sortRules.length > 1 && (
+            <span className="ml-2">
+              • 多重排序：{sortRules.map((rule, i) => {
+                const labels = { time: '时间', rarity: '稀有度', wear: '磨损', name: '姓名' }
+                return `${i + 1}.${labels[rule.key]}${rule.order === 'desc' ? '↓' : '↑'}`
+              }).join(' → ')}
+            </span>
+          )}
+        </div>
       </div>
 
       {/* 网格卡片 */}
       <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-        {visibleRecords.map((r) => {
-          const displayName = safeDisplayName(r.studentId, r.name, roster)
+        {filteredAndSortedHistory.map((r) => {
+          const student = roster.find(s => s.id === r.studentId)
+          const displayName = student?.name || r.name || '未知学生'
           const initial = displayName.length > 0 ? displayName.charAt(0).toUpperCase() : '?'
           return (
             <div

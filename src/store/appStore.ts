@@ -1,6 +1,7 @@
 import { create } from 'zustand';
 import { persist, createJSONStorage } from 'zustand/middleware';
 import { drawRarity as configDrawRarity, drawWearLevel, generateWearValue, type Rarity, type WearLevel } from '../config/rarityConfig';
+import { getMaxHistoryRecords } from '../config/storageConfig';
 
 /**
  * 稀有度类型（CSGO 风格）
@@ -335,7 +336,7 @@ export const useAppStore = create<AppState>()(
             pool: nextPool,
             lastResult: result,
             selectedStudent: student,
-            history: [...s.history, result].slice(-200),
+            history: [...s.history, result].slice(-getMaxHistoryRecords()),
           } as Partial<AppState>;
         });
 

@@ -5,6 +5,7 @@ import type { Speed } from '../store/appStore'
 import * as XLSX from 'xlsx'
 import { sfx } from '../lib/audioManager'
 import ProbabilityDisplay from './ProbabilityDisplay'
+import { getMaxHistoryRecords, formatStorageSize } from '../config/storageConfig'
 
 export interface SettingsModalProps {
   /** 是否显示弹窗 */
@@ -549,23 +550,72 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
         
         {/* 历史记录管理 */}
         <div className="px-6 pb-2 w-full">
-          <div className="flex items-center justify-between">
-            <div className="text-sm opacity-75">历史记录：{historyCount} 条</div>
-            <button
-              type="button"
-              onClick={() => {
-                sfx.click()
-                if (historyCount === 0) return
-                if (confirm(`确定删除全部 ${historyCount} 条抽奖记录？该操作不可恢复。`)) {
-                  clearHistory()
-                }
-              }}
-              disabled={historyCount === 0}
-              className="px-3 py-2 rounded-md bg-red-600 hover:bg-red-500 border border-red-300/30 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-              title="清空抽奖记录"
-            >
-              清空抽奖记录
-            </button>
+          <div className="pt-4 border-t border-white/10">
+            <div className="text-sm font-medium mb-3">存储管理</div>
+            
+            {/* 存储状态显示 */}
+            <div className="mb-3 p-3 rounded-lg bg-white/5 border border-white/10">
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-sm">历史记录存储</span>
+                <span className="text-xs px-2 py-1 rounded bg-blue-600/20 text-blue-400 border border-blue-500/30">
+                  {historyCount} / {getMaxHistoryRecords()} 条
+                </span>
+              </div>
+              
+              {/* 存储进度条 */}
+              <div className="mb-2">
+                <div className="flex items-center justify-between text-xs mb-1">
+                  <span>存储使用率</span>
+                  <span>{((historyCount / getMaxHistoryRecords()) * 100).toFixed(1)}%</span>
+                </div>
+                <div className="w-full bg-white/10 rounded-full h-2">
+                  <div 
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      historyCount / getMaxHistoryRecords() > 0.8 
+                        ? 'bg-red-500' 
+                        : historyCount / getMaxHistoryRecords() > 0.6 
+                        ? 'bg-yellow-500' 
+                        : 'bg-green-500'
+                    }`}
+                    style={{ width: `${Math.min((historyCount / getMaxHistoryRecords()) * 100, 100)}%` }}
+                  />
+                </div>
+              </div>
+              
+              <div className="text-xs opacity-60">
+                当前存储限制：{formatStorageSize(getMaxHistoryRecords())}，
+                {historyCount >= getMaxHistoryRecords() 
+                  ? '已达到存储上限，新记录将覆盖最旧的记录' 
+                  : `还可存储 ${getMaxHistoryRecords() - historyCount} 条记录`}
+              </div>
+            </div>
+            
+            {/* 存储管理操作 */}
+            <div className="flex items-center justify-between">
+              <div className="text-sm opacity-75">历史记录管理</div>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    sfx.click()
+                    if (historyCount === 0) return
+                    if (confirm(`确定删除全部 ${historyCount} 条抽奖记录？该操作不可恢复。`)) {
+                      clearHistory()
+                    }
+                  }}
+                  disabled={historyCount === 0}
+                  className="px-3 py-2 rounded-md bg-red-600 hover:bg-red-500 border border-red-300/30 text-xs font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  title="清空抽奖记录"
+                >
+                  清空记录
+                </button>
+              </div>
+            </div>
+            
+            <div className="text-xs opacity-60 mt-2">
+              提示：收藏馆现已支持存储 {formatStorageSize(getMaxHistoryRecords())}，相比之前的200条大幅提升。
+              当存储满时，系统会自动删除最旧的记录以腾出空间。
+            </div>
           </div>
         </div>
 
