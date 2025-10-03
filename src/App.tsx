@@ -47,6 +47,8 @@ function App() {
   } = useAppStore()
 
   const [openSettings, setOpenSettings] = useState(false)
+  // 结果覆盖层（在轮盘页面之上显示，不切换页面）
+  const [showResultOverlay, setShowResultOverlay] = useState(false)
   const [currentPage, setCurrentPage] = useState<PageState>('home')
   const [rollItems, setRollItems] = useState<{ id: string; name: string; rarity: Rarity }[] | null>(null)
   const [targetIndex, setTargetIndex] = useState(0)
@@ -300,42 +302,48 @@ function App() {
     if (activeResult) sfx.reveal(activeResult.rarity)
     // 揭晓后恢复 BGM 音量
     sfx.fadeBgmTo(settings.bgmVolume, 380)
-    // 先清空队列，再切换页面，避免轮盘在结果页面显示时抽动
-    setRollItems(null)
-    // 延迟切换到结果页面，让轮盘退出动画完成（0.4秒）
-    setTimeout(() => {
-      setCurrentPage('result')
+    // 显示结果覆盖层，不切换页面，轮盘保持在下层
+    setShowResultOverlay(true)
 
-      // 若处于自动连抽：统计次数并在短暂停留后继续下一次
-      if (isAutoRolling) {
-        autoRollCountRef.current += 1
-        const finished = autoRollCountRef.current >= 5
-        if (!finished) {
-          // 在结果页停留一段时间，随后继续下一抽
-          if (autoRollTimerRef.current) clearTimeout(autoRollTimerRef.current)
-          autoRollTimerRef.current = setTimeout(() => {
-            performNextAutoRoll()
-          }, resultPauseMs())
-        } else {
-          // 完成 5 连抽，退出自动模式
-          setIsAutoRolling(false)
-        }
+    // 若处于自动连抽：统计次数并在短暂停留后继续下一次
+    if (isAutoRolling) {
+      autoRollCountRef.current += 1
+      const finished = autoRollCountRef.current >= 5
+      if (!finished) {
+        // 在结果覆盖层停留一段时间，随后关闭覆盖层并继续下一抽
+        if (autoRollTimerRef.current) clearTimeout(autoRollTimerRef.current)
+        autoRollTimerRef.current = setTimeout(() => {
+          setShowResultOverlay(false)
+          // 返回主页并清理当前轮盘数据，再触发下一次抽取
+          setCurrentPage('home')
+          setRollItems(null)
+          performNextAutoRoll()
+        }, resultPauseMs())
+      } else {
+        // 完成 5 连抽，退出自动模式（保留最后一次结果覆盖层）
+        setIsAutoRolling(false)
       }
-    }, 400)
+    }
   }
 
   /**
    * 处理继续抽奖
    */
   const handleContinue = () => {
+    // 关闭结果覆盖层并返回主页，清理当前轮盘数据
+    setShowResultOverlay(false)
     setCurrentPage('home')
+    setRollItems(null)
   }
 
   /**
    * 处理关闭结果弹窗
    */
   const handleCloseResult = () => {
+    // 关闭结果覆盖层并返回主页，清理当前轮盘数据
+    setShowResultOverlay(false)
     setCurrentPage('home')
+    setRollItems(null)
   }
 
   /**
@@ -492,9 +500,9 @@ function App() {
         onComplete={handleRouletteComplete}
       />
 
-      {/* 抽奖结果页面 */}
+      {/* 抽奖结果覆盖层（在轮盘页面之上显示） */}
       <ResultScreen
-        isOpen={currentPage === 'result'}
+        isOpen={showResultOverlay}
         lastResult={activeResult || null}
         selectedStudent={(activeResult ? (roster.find(s => s.id === activeResult.studentId) || null) : null)}
         onContinue={handleContinue}
