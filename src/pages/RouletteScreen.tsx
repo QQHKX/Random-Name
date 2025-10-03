@@ -12,8 +12,12 @@ interface RouletteScreenProps {
   rollItems: { id: string; name: string; rarity: Rarity }[] | null
   /** 目标项目索引 */
   targetIndex: number
+  /** 目标项目 ID（稳定定位） */
+  targetId?: string
   /** 抽奖速度设置 */
   speed: 'slow' | 'normal' | 'fast'
+  /** 会话 id，用于稳定渲染关键值 */
+  sessionId?: string
   /** 轮盘滚动完成回调 */
   onComplete: () => void
 }
@@ -28,7 +32,9 @@ export default function RouletteScreen({
   isOpen,
   rollItems,
   targetIndex,
+  targetId,
   speed,
+  sessionId,
   onComplete
 }: RouletteScreenProps) {
   return (
@@ -97,7 +103,9 @@ export default function RouletteScreen({
                   <Roulette
                     items={rollItems}
                     targetIndex={targetIndex}
+                    targetId={targetId}
                     speed={speed}
+                    sessionId={sessionId}
                     onComplete={onComplete}
                   />
                 )}

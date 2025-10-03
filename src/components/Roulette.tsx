@@ -24,10 +24,14 @@ export interface RouletteProps {
   items: RouletteItem[]
   /** 目标项索引（将停在中心） */
   targetIndex: number
+  /** 目标项 ID（优先级高于索引，用于稳定定位） */
+  targetId?: string
   /** 动画速度 */
   speed: 'slow' | 'normal' | 'fast'
   /** 动画完成回调（减速停止并高亮后触发） */
   onComplete?: () => void
+  /** 本次抽奖的会话 id（用于稳定渲染 key） */
+  sessionId?: string
 }
 
 const TILE_W = 180 // 单卡片宽度
@@ -82,7 +86,7 @@ function xToIndex(x: number, centerOffset: number) {
  * @param onComplete 动画完成回调（停在中心后执行）
  * @returns JSX.Element 轮盘视图
  */
-export default function Roulette({ items, targetIndex, speed, onComplete }: RouletteProps) {
+export default function Roulette({ items, targetIndex, targetId, speed, onComplete, sessionId }: RouletteProps) {
   const wrapRef = useRef<HTMLDivElement | null>(null)
   const [centerOffset, setCenterOffset] = useState(0)
   const [stopped, setStopped] = useState(false)
@@ -121,34 +125,9 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
   useEffect(() => {
     setStopped(false)
     lastTickStepRef.current = null
-  }, [items, targetIndex])
+  }, [items, targetIndex, targetId])
 
-  // 计算需要滚动到的 X 距离（考虑左侧预补齐 prepad）
-  const finalX = useMemo(() => {
-    const el = wrapRef.current
-    const rectW = el?.getBoundingClientRect().width || 0
-    const cw = el?.clientWidth || 0
-    const width = rectW || cw
-    const styles = el ? getComputedStyle(el) : null
-    const padL = styles ? parseFloat(styles.paddingLeft || '0') : 0
-    const padR = styles ? parseFloat(styles.paddingRight || '0') : 0
-    const contentW = Math.max(0, width - padL - padR)
-    const visibleCount = contentW > 0 ? Math.ceil((contentW + TILE_GAP) / STEP) + 1 : 0
-    const half = Math.ceil(visibleCount / 2)
-    const prepad = half + 1
-
-    // 目标卡片在displayItems中的位置
-    const targetDisplayIndex = targetIndex + prepad
-    // 目标卡片左边缘的位置
-    const targetLeft = targetDisplayIndex * STEP
-    // 目标卡片中心的位置
-    const targetCenter = targetLeft + TILE_W / 2
-    // 容器中心的位置（相对于容器左边缘）
-    const containerCenter = padL + contentW / 2
-    
-    // 修复：为确保指针所指即为抽取结果，移除随机偏移，精确对齐目标卡片中心到容器中心
-    return containerCenter - targetCenter
-  }, [targetIndex, centerOffset])
+  // 注意：依赖 displayItems，放置在其之后以避免 TDZ
 
   // 初次渲染与窗口大小变化时，计算中心偏移
   useEffect(() => {
@@ -185,9 +164,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
    */
   const displayItems = useMemo(() => {
     const el = wrapRef.current
-    const rectW = el?.getBoundingClientRect().width || 0
-    const cw = el?.clientWidth || 0
-    const width = rectW || cw
+    const width = el?.clientWidth || 0
     if (width <= 0 || items.length === 0 || !el) return items
 
     const styles = getComputedStyle(el)
@@ -195,10 +172,10 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
     const padR = parseFloat(styles.paddingRight || '0')
     const contentW = width - padL - padR
 
-    const visibleCount = Math.ceil((contentW + TILE_GAP) / STEP) + 1
-    const half = Math.ceil(visibleCount / 2)
-    const prepad = half + 1
+    const prepad = computePrepad(el)
     const buffer = reducedEffects ? 2 : 10 // 进一步减少离屏渲染数量
+    // 计算可视卡片数量（含间隙），用于右侧补齐
+    const visibleCount = Math.ceil((contentW + TILE_GAP) / STEP) + 1
 
     // 左侧克隆 prepad 项（从原数组尾部取）
     const leftClones: RouletteItem[] = []
@@ -223,46 +200,57 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
     return extended
   }, [items, targetIndex, centerOffset, reducedEffects])
 
+  // 基于 displayItems 与 targetId 计算目标显示索引（用于定位终点）
+  const effectiveDisplayTargetIndex = useMemo(() => {
+    const el = wrapRef.current
+    const prepad = computePrepad(el)
+    if (targetId) {
+      const idx = displayItems.findIndex((it) => it.id === targetId)
+      return idx >= 0 ? idx : prepad + targetIndex
+    }
+    return prepad + targetIndex
+  }, [displayItems, targetId, targetIndex])
+
+  // 计算需要滚动到的 X 距离（考虑左侧预补齐 prepad）
+  const finalX = useMemo(() => {
+    const el = wrapRef.current
+    const styles = el ? getComputedStyle(el) : null
+    const padL = styles ? parseFloat(styles.paddingLeft || '0') : 0
+    const padR = styles ? parseFloat(styles.paddingRight || '0') : 0
+    const contentW = el ? Math.max(0, el.clientWidth - padL - padR) : 0
+
+    // 目标卡片左边缘的位置
+    const targetLeft = effectiveDisplayTargetIndex * STEP
+    // 目标卡片中心的位置
+    const targetCenter = targetLeft + TILE_W / 2
+    // 容器中心的位置（相对于容器左边缘）
+    const containerCenter = padL + contentW / 2
+
+    return containerCenter - targetCenter
+  }, [effectiveDisplayTargetIndex, centerOffset])
+
   // 基于 id 的目标索引计算，避免不同设备上的几何误差导致错位
   const displayTargetIndex = useMemo(() => {
+    if (targetId) {
+      const idx = displayItems.findIndex((it) => it.id === targetId)
+      return idx
+    }
     if (!items || items.length === 0) return -1
     const realTarget = items[targetIndex]
     if (!realTarget) return -1
     const idx = displayItems.findIndex((it) => it.id === realTarget.id)
     return idx
-  }, [displayItems, items, targetIndex])
+  }, [displayItems, items, targetIndex, targetId])
 
-  // 启动动画（单段 CSGO 曲线），同步考虑 prepad 以确保初始位置即有足够左侧内容
+  // 启动动画（单段 CSGO 曲线），与 effectiveDisplayTargetIndex/最终对齐保持一致，避免末端跳动
   useEffect(() => {
     if (!wrapRef.current) return
     if (!items || items.length === 0) return
 
     setStopped(false)
 
-    // 计算 prepad（基于当前容器宽度与可视卡片数）
-    let prepad = 0
-    {
-      const el = wrapRef.current
-      const rectW = el?.getBoundingClientRect().width || 0
-      const cw = el?.clientWidth || 0
-      const width = rectW || cw
-      if (width > 0 && el) {
-        const styles = getComputedStyle(el)
-        const padL = parseFloat(styles.paddingLeft || '0')
-        const padR = parseFloat(styles.paddingRight || '0')
-        const contentW = Math.max(0, width - padL - padR)
-        const visibleCount = Math.ceil((contentW + TILE_GAP) / STEP) + 1
-        const half = Math.ceil(visibleCount / 2)
-        prepad = half + 1
-      }
-    }
-
-    const targetDisplayIndex = prepad + targetIndex
-    // 终点 X：让目标卡片中心对齐指示线
-    const localFinalX = centerOffset - (targetDisplayIndex * STEP)
-
     const x0 = centerOffset
-    const x3 = localFinalX
+    const x3 = finalX
 
     // 记录总距离用于 onUpdate 计算音量强度
     {
@@ -282,7 +270,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
         transition: { duration, ease: CSGO_EASE },
       })
     })
-  }, [items, targetIndex, centerOffset, duration, controls])
+  }, [items, targetIndex, targetId, centerOffset, duration, controls, finalX])
 
   // onUpdate 里做滴答触发：当“经过的卡片索引”变化时播放一次（加入时间节流）
   const handleUpdate = (latest: any) => {
@@ -316,7 +304,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
       {/* 滚动视口 */}
       <div ref={wrapRef} className="overflow-hidden px-2 py-3 border border-white/10 rounded-xl bg-black/20 backdrop-blur-sm" style={{ contain: 'paint' }}>
         <motion.div
-           key={`${displayItems.length}-${targetIndex}-${Math.round(centerOffset)}`}
+           key={`${sessionId ?? 'roll'}-${targetId ?? targetIndex}-${Math.round(centerOffset)}`}
             className="flex items-center"
             style={{ gap: TILE_GAP, willChange: 'transform', transform: 'translateZ(0)' }}
             initial={{ x: centerOffset }}
@@ -370,3 +358,16 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
     </div>
   )
 }
+  // 统一的 prepad 计算（使用 clientWidth 与 padding），避免不同计算路径产生差异
+  function computePrepad(el: HTMLDivElement | null) {
+    if (!el) return 0
+    const w = el.clientWidth || 0
+    if (w <= 0) return 0
+    const styles = getComputedStyle(el)
+    const padL = parseFloat(styles.paddingLeft || '0')
+    const padR = parseFloat(styles.paddingRight || '0')
+    const contentW = Math.max(0, w - padL - padR)
+    const visibleCount = Math.ceil((contentW + TILE_GAP) / STEP) + 1
+    const half = Math.ceil(visibleCount / 2)
+    return half + 1
+  }

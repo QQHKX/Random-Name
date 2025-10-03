@@ -11,7 +11,7 @@ import DrawnStudentsSidebar from './components/DrawnStudentsSidebar'
 import SystemStatusPanel from './components/SystemStatusPanel'
 import SettingsPanel from './components/SettingsPanel'
 import { sfx } from './lib/audioManager'
-import type { Rarity, Student } from './store/appStore'
+import type { Rarity, Student, RollResult } from './store/appStore'
 import { drawRarity as configDrawRarity } from './config/rarityConfig'
 
 
@@ -50,8 +50,11 @@ function App() {
   const [currentPage, setCurrentPage] = useState<PageState>('home')
   const [rollItems, setRollItems] = useState<{ id: string; name: string; rarity: Rarity }[] | null>(null)
   const [targetIndex, setTargetIndex] = useState(0)
+  const [rollSessionId, setRollSessionId] = useState<string>('')
   const [audioStatus, setAudioStatus] = useState(() => sfx.getCacheStatus())
   const galleryRef = useRef<HTMLDivElement | null>(null)
+  // 单次抽取的本地结果（作为结果页的唯一真相来源，避免竞态）
+  const [activeResult, setActiveResult] = useState<RollResult | null>(null)
   
   // 5连抽状态
   const [isAutoRolling, setIsAutoRolling] = useState(false)
@@ -162,6 +165,8 @@ function App() {
 
     // 切换到轮盘页面
     setCurrentPage('roulette')
+    // 生成新的会话 id（用于稳定 Roulette 渲染 key）
+    setRollSessionId(`sess-${Date.now()}-${Math.floor(Math.random()*1e4)}`)
 
     // 先计算结果，但暂不展示，拿到结果后构建滚动序列
     const result = drawNext()
@@ -176,9 +181,12 @@ function App() {
       return
     }
 
-    // 直接使用 result 中的名称，避免状态更新时序问题
+    // 直接使用 result 中的 id 与名称，避免状态更新时序问题
     const finalName = result.name
-    buildSequence(finalName, result.rarity)
+    const finalStudentId = result.studentId
+    // 记录本次抽取的结果，用于结果展示与揭晓音效
+    setActiveResult(result)
+    buildSequence(finalStudentId, finalName, result.rarity)
   }
 
   /**
@@ -224,30 +232,42 @@ function App() {
    * @param finalName 目标姓名
    * @param finalRarity 目标稀有度
    */
-  function buildSequence(finalName: string, finalRarity: Rarity) {
-    // 从全局状态读取 roster，构建姓名源，避免使用 pool（其为 id 列表）
+  function buildSequence(finalStudentId: string, finalName: string, finalRarity: Rarity) {
+    // 从全局状态读取 roster，构建姓名源与 id 映射，避免使用 pool（其为 id 列表）
     const { roster } = useAppStore.getState()
-    const sourceNames: string[] = (roster && roster.length > 0) ? roster.map((s) => s.name) : [finalName]
+    const sourceStudents = Array.isArray(roster) ? roster : []
+    const sourceNames: string[] = sourceStudents.length > 0 ? sourceStudents.map((s) => s.name) : [finalName]
+    const nameToId = new Map<string, string>()
+    for (const s of sourceStudents) {
+      if (!nameToId.has(s.name)) nameToId.set(s.name, s.id)
+    }
+    // 排除最终姓名，避免视觉上出现同名卡片导致误判
+    const fillerNames = sourceNames.filter((n) => n !== finalName)
+    const namePool = fillerNames.length > 0 ? fillerNames : [finalName]
 
     // 根据速度决定填充数量，保证视觉上先快后慢足够距离
     const fillerCount = settings.speed === 'fast' ? 12 : settings.speed === 'slow' ? 24 : 18
 
     // 采用步进采样保证分布均匀，避免连读同名
     const step = 7
-    let start = Math.floor(Math.random() * Math.max(1, sourceNames.length))
+    let start = Math.floor(Math.random() * Math.max(1, namePool.length))
     const fillers: string[] = []
     for (let i = 0; i < fillerCount; i++) {
-      const n = sourceNames[(start + i * step) % Math.max(1, sourceNames.length)] || finalName
+      const n = namePool[(start + i * step) % Math.max(1, namePool.length)] || finalName
       fillers.push(n)
     }
 
     // 构建 items，最后一个为目标项（稀有度取真实结果，其余为随机稀有度）
     const seq = [...fillers, finalName]
-    const items = seq.map((n, i) => ({
-      id: `${i}-${n}`,
-      name: n,
-      rarity: i === seq.length - 1 ? finalRarity : rollRarity(),
-    }))
+    const items = seq.map((n, i) => {
+      const isTarget = i === seq.length - 1
+      const sid = isTarget ? finalStudentId : (nameToId.get(n) ?? `filler-${i}-${n}`)
+      return {
+        id: sid,
+        name: n,
+        rarity: isTarget ? finalRarity : rollRarity(),
+      }
+    })
     setRollItems(items)
     setTargetIndex(items.length - 1)
   }
@@ -277,8 +297,7 @@ function App() {
    */
   const handleRouletteComplete = () => {
     // 揭晓音效
-    const r = useAppStore.getState().lastResult
-    if (r) sfx.reveal(r.rarity)
+    if (activeResult) sfx.reveal(activeResult.rarity)
     // 揭晓后恢复 BGM 音量
     sfx.fadeBgmTo(settings.bgmVolume, 380)
     // 先清空队列，再切换页面，避免轮盘在结果页面显示时抽动
@@ -302,7 +321,7 @@ function App() {
           setIsAutoRolling(false)
         }
       }
-    }, 10)
+    }, 400)
   }
 
   /**
@@ -467,15 +486,17 @@ function App() {
         isOpen={currentPage === 'roulette'}
         rollItems={rollItems}
         targetIndex={targetIndex}
+        targetId={rollItems ? rollItems[targetIndex]?.id : undefined}
         speed={settings.speed}
+        sessionId={rollSessionId}
         onComplete={handleRouletteComplete}
       />
 
       {/* 抽奖结果页面 */}
       <ResultScreen
         isOpen={currentPage === 'result'}
-        lastResult={lastResult || null}
-        selectedStudent={selectedStudent || null}
+        lastResult={activeResult || null}
+        selectedStudent={(activeResult ? (roster.find(s => s.id === activeResult.studentId) || null) : null)}
         onContinue={handleContinue}
         onClose={handleCloseResult}
         lockClose={isAutoRolling}
