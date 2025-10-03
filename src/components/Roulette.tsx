@@ -95,7 +95,18 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
       const dpr = typeof window !== 'undefined' ? window.devicePixelRatio || 1 : 1
       const w = typeof window !== 'undefined' ? window.innerWidth || 0 : 0
       const cores = (navigator as any)?.hardwareConcurrency || 4
-      return prefers || (dpr >= 2 && w >= 1600) || cores <= 4
+      const mem = (navigator as any)?.deviceMemory || 8
+      const largeScreen = w >= 1600
+      const highDpr = dpr >= 2
+      const lowCores = cores <= 4
+      const lowMem = mem <= 4
+      // 综合考虑用户偏好、设备能力与屏幕规模
+      return (
+        prefers ||
+        (largeScreen && (highDpr || lowCores || lowMem)) ||
+        (highDpr && lowCores) ||
+        lowMem
+      )
     } catch {
       return false
     }
@@ -165,7 +176,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
   const duration = speedDuration(speed)
   const baseTickFreq = useMemo(() => {
     const f = speed === 'fast' ? 980 : speed === 'slow' ? 800 : 880
-    return reducedEffects ? f - 80 : f
+    return reducedEffects ? f - 120 : f
   }, [speed, reducedEffects])
 
   /**
@@ -187,7 +198,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
     const visibleCount = Math.ceil((contentW + TILE_GAP) / STEP) + 1
     const half = Math.ceil(visibleCount / 2)
     const prepad = half + 1
-    const buffer = reducedEffects ? 4 : 10 // 优化：减少离屏渲染数量
+    const buffer = reducedEffects ? 2 : 10 // 进一步减少离屏渲染数量
 
     // 左侧克隆 prepad 项（从原数组尾部取）
     const leftClones: RouletteItem[] = []
@@ -279,7 +290,7 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
 
     if (lastTickStepRef.current === null || step !== lastTickStepRef.current) {
       const now = (typeof performance !== 'undefined' && performance.now) ? performance.now() : Date.now()
-      const minGap = reducedEffects ? 24 : 12 // ms，低性能设备降低滴答频率
+      const minGap = reducedEffects ? 36 : 12 // ms，低性能设备进一步降低滴答频率
       if (now - lastTickTsRef.current >= minGap) {
         // 计算强度：随剩余距离降低（越接近终点声音越轻）
         const remaining = Math.max(0, Math.abs(finalX - x))
@@ -301,11 +312,11 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
       <div className={reducedEffects ? "pointer-events-none absolute inset-0 z-10" : "pointer-events-none absolute inset-0 z-10 bg-gradient-to-r from-[rgba(0,0,0,0.35)] via-transparent to-[rgba(0,0,0,0.35)]"} />
 
       {/* 滚动视口 */}
-      <div ref={wrapRef} className="overflow-hidden px-2 py-3 border border-white/10 rounded-xl bg-black/20 backdrop-blur-sm">
+      <div ref={wrapRef} className="overflow-hidden px-2 py-3 border border-white/10 rounded-xl bg-black/20 backdrop-blur-sm" style={{ contain: 'paint' }}>
         <motion.div
            key={`${displayItems.length}-${targetIndex}-${Math.round(centerOffset)}`}
             className="flex items-center"
-            style={{ gap: TILE_GAP, willChange: 'transform' }}
+            style={{ gap: TILE_GAP, willChange: 'transform', transform: 'translateZ(0)' }}
             initial={{ x: centerOffset }}
             animate={controls}
             onUpdate={handleUpdate}
