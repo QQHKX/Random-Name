@@ -42,8 +42,6 @@ function App() {
     pool,
     resetPool,
     drawNext,
-    lastResult,
-    selectedStudent,
   } = useAppStore()
 
   const [openSettings, setOpenSettings] = useState(false)
