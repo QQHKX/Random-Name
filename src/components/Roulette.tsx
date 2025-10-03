@@ -212,22 +212,12 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
     return extended
   }, [items, targetIndex, centerOffset, reducedEffects])
 
-  // 新增：预计算目标项在 displayItems 中的索引，避免在 map 中重复计算与量测
+  // 新增：基于最终位移几何计算目标索引，确保与实际停留位置一致
   const displayTargetIndex = useMemo(() => {
-    const el = wrapRef.current
-    if (!el) return -1
-    const rectW = el.getBoundingClientRect().width || 0
-    const cw = el.clientWidth || 0
-    const width = rectW || cw
-    const styles = getComputedStyle(el)
-    const padL = parseFloat(styles.paddingLeft || '0')
-    const padR = parseFloat(styles.paddingRight || '0')
-    const contentW = Math.max(0, width - padL - padR)
-    const visibleCount = Math.ceil((contentW + TILE_GAP) / STEP) + 1
-    const half = Math.ceil(visibleCount / 2)
-    const prepad = half + 1
-    return prepad + targetIndex
-  }, [targetIndex, centerOffset])
+    // 使用最终位移与中心偏移换算获得中心处卡片索引
+    const idx = Math.round((centerOffset - finalX) / STEP)
+    return Number.isFinite(idx) ? idx : -1
+  }, [finalX, centerOffset])
 
   // 启动动画（单段 CSGO 曲线），同步考虑 prepad 以确保初始位置即有足够左侧内容
   useEffect(() => {
