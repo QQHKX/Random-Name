@@ -79,17 +79,7 @@ function formatTime(ts: number): string {
   return date.toLocaleDateString('zh-CN', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
 }
 
-/**
- * 根据历史记录和 roster 生成安全的显示名称
- * - 优先使用历史记录中的 name，确保与当时抽取结果一致
- * - 回退到 roster 中的姓名（若历史数据缺失 name）
- * - 最终回退到 'Unknown'
- */
-function safeDisplayName(studentId: string, historyName: string | undefined, roster: { id: string, name: string }[]): string {
-  if (historyName && historyName.trim().length > 0) return historyName
-  const rosterMap = new Map(roster.map(s => [s.id, s]))
-  return rosterMap.get(studentId)?.name ?? 'Unknown'
-}
+// 已废弃：此前用于名称兼容的函数，现改为直接从 roster 或历史记录读取
 
 /**
  * 收藏馆组件
