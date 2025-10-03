@@ -223,12 +223,14 @@ export default function Roulette({ items, targetIndex, speed, onComplete }: Roul
     return extended
   }, [items, targetIndex, centerOffset, reducedEffects])
 
-  // 新增：基于最终位移几何计算目标索引，确保与实际停留位置一致
+  // 基于 id 的目标索引计算，避免不同设备上的几何误差导致错位
   const displayTargetIndex = useMemo(() => {
-    // 使用最终位移与中心偏移换算获得中心处卡片索引
-    const idx = Math.round((centerOffset - finalX) / STEP)
-    return Number.isFinite(idx) ? idx : -1
-  }, [finalX, centerOffset])
+    if (!items || items.length === 0) return -1
+    const realTarget = items[targetIndex]
+    if (!realTarget) return -1
+    const idx = displayItems.findIndex((it) => it.id === realTarget.id)
+    return idx
+  }, [displayItems, items, targetIndex])
 
   // 启动动画（单段 CSGO 曲线），同步考虑 prepad 以确保初始位置即有足够左侧内容
   useEffect(() => {
