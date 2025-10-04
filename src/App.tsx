@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import './App.css'
 import { useAppStore } from './store/appStore'
 import SettingsModal from './components/SettingsModal'
+import StorageModal from './components/StorageModal'
 import RouletteScreen from './pages/RouletteScreen'
 import ResultScreen from './pages/ResultScreen'
 import Gallery from './components/Gallery'
@@ -45,6 +46,7 @@ function App() {
   } = useAppStore()
 
   const [openSettings, setOpenSettings] = useState(false)
+  const [openStorage, setOpenStorage] = useState(false)
   // 结果覆盖层（在轮盘页面之上显示，不切换页面）
   const [showResultOverlay, setShowResultOverlay] = useState(false)
   const [currentPage, setCurrentPage] = useState<PageState>('home')
@@ -462,11 +464,12 @@ function App() {
               <div className="sticky top-6 space-y-4 lg:space-y-6">
                 
                 {/* 系统状态 */}
-                <SystemStatusPanel audioStatus={audioStatus} />
+              <SystemStatusPanel audioStatus={audioStatus} />
 
-                {/* 设置面板 */}
-                <SettingsPanel 
+              {/* 设置面板 */}
+              <SettingsPanel 
                   onOpenSettings={() => setOpenSettings(true)}
+                  onOpenStorage={() => setOpenStorage(true)}
                   onResetPool={handleResetPool}
                   resetDisabled={roster.length === 0}
                 />
@@ -523,6 +526,9 @@ function App() {
 
       {/* 设置面板挂载 */}
       <SettingsModal open={openSettings} onClose={() => setOpenSettings(false)} />
+      
+      {/* 存储管理弹窗 */}
+      <StorageModal open={openStorage} onClose={() => setOpenStorage(false)} />
     </div>
   )
 }

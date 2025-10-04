@@ -7,6 +7,8 @@ import { sfx } from '../lib/audioManager'
 export interface SettingsPanelProps {
   /** 打开设置面板回调 */
   onOpenSettings: () => void
+  /** 打开存储管理页面回调 */
+  onOpenStorage: () => void
   /** 重置抽取池回调 */
   onResetPool: () => void
   /** 是否禁用重置按钮 */
@@ -23,6 +25,7 @@ export interface SettingsPanelProps {
  */
 const SettingsPanel: React.FC<SettingsPanelProps> = ({
   onOpenSettings,
+  onOpenStorage,
   onResetPool,
   resetDisabled = false,
   className = ''
@@ -33,6 +36,14 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
   const handleSettingsClick = () => {
     sfx.click()
     onOpenSettings()
+  }
+
+  /**
+   * 处理存储管理按钮点击
+   */
+  const handleStorageClick = () => {
+    sfx.click()
+    onOpenStorage()
   }
 
   /**
@@ -75,6 +86,16 @@ const SettingsPanel: React.FC<SettingsPanelProps> = ({
         >
           <span className="hidden sm:inline">打开设置面板</span>
           <span className="sm:hidden">设置</span>
+        </button>
+
+        {/* 存储管理按钮 */}
+        <button 
+          className="w-full px-3 lg:px-4 py-2 lg:py-3 rounded-lg lg:rounded-xl bg-white/5 hover:bg-white/10 border border-white/10 transition-colors text-white text-sm lg:text-base font-medium" 
+          onClick={handleStorageClick}
+          title="存储管理"
+        >
+          <span className="hidden sm:inline">打开存储管理</span>
+          <span className="sm:hidden">存储</span>
         </button>
         
         {/* 重置抽取池按钮 */}
