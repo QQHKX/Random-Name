@@ -1,4 +1,3 @@
-import React from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAppStore } from '../store/appStore'
 import { getMaxHistoryRecords, formatStorageSize } from '../config/storageConfig'

@@ -1,4 +1,3 @@
-import React from 'react'
 import { useAppStore } from '../store/appStore'
 import { getMaxHistoryRecords, formatStorageSize } from '../config/storageConfig'
 import { sfx } from '../lib/audioManager'
