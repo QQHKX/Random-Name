@@ -3,7 +3,7 @@ import { Howl, Howler } from 'howler'
 /**
  * audioManager CSGO风格音效管理器
  * - 使用真实CSGO音频文件提供沉浸式体验
- * - 支持BGM循环播放和各类SFX音效
+ * - 仅支持各类SFX音效（已移除BGM）
  * - 暴露 click / tick / reveal / unlock 等音效 API
  */
 
@@ -13,16 +13,13 @@ let sfxVolume = 0.8 // SFX音量
 
 // BGM 播放器
 let bgmHowl: Howl | null = null
-let bgmTargetVolume = 0.3
+
 
 // SFX 音效播放器缓存
 let sfxCache: { [key: string]: Howl } = {}
 
 // 音频文件路径配置
 const AUDIO_FILES = {
-  bgm: {
-    main: '/audio/bgm_main_loop.mp3'
-  },
   sfx: {
     button_click: '/audio/sfx/ui_button_click.wav',
     item_scroll: '/audio/sfx/item_scroll.wav',
@@ -51,7 +48,7 @@ export async function preloadAllAudio(onProgress?: (progress: number) => void): 
   }
 
   const allFiles = [
-    ...Object.values(AUDIO_FILES.bgm),
+    // 仅预加载 SFX，移除 BGM
     ...Object.values(AUDIO_FILES.sfx)
   ]
   
@@ -84,9 +81,6 @@ export async function preloadAllAudio(onProgress?: (progress: number) => void): 
             if (fileName) {
               sfxCache[fileName] = howl
             }
-          } else if (url.includes('bgm_main_loop')) {
-            bgmHowl = howl
-            bgmHowl.volume(bgmTargetVolume)
           }
           
           resolve(true)
@@ -194,100 +188,26 @@ export async function unlockAudio(): Promise<void> {
 }
 
 /** 设置 BGM 音量（0..1） */
-function setBgmVolume(v: number) {
-  bgmTargetVolume = clamp01(v)
-  try {
-    if (bgmHowl) bgmHowl.volume(bgmTargetVolume)
-  } catch {}
-}
-
-/**
- * 获取或创建SFX音效（优先使用预加载缓存）
- * @param name 音效名称
- * @param url 音效文件路径
- */
-function getSfx(name: string, url: string): Howl {
-  // 优先使用预加载的缓存实例
-  if (sfxCache[name]) {
-    const cachedSfx = sfxCache[name]
-    // 确保音量设置正确
-    cachedSfx.volume(sfxVolume * masterVolume)
-    return cachedSfx
-  }
-  
-  // 如果缓存中没有，则动态创建（兜底方案）
-  console.warn(`音效 ${name} 未在缓存中找到，动态加载中...`)
-  sfxCache[name] = new Howl({
-    src: [url],
-    volume: sfxVolume * masterVolume,
-    preload: true,
-    html5: false,
-    pool: 2
-  })
-  
-  return sfxCache[name]
-}
-
-/**
- * 播放SFX音效
- * @param name 音效名称
- * @param url 音效文件路径
- */
-function playSfx(name: string, url: string) {
-  try {
-    const sfx = getSfx(name, url)
-    sfx.volume(sfxVolume * masterVolume)
-    sfx.play()
-  } catch (e) {
-    console.warn(`Failed to play SFX: ${name}`, e)
-  }
+function setBgmVolume(_v: number) {
+  // 已移除BGM：不执行任何操作
 }
 
 /**
  * 播放/启动 BGM（优先使用预加载实例）
  * @param url 可选自定义 BGM 地址（默认 /audio/bgm_main_loop.mp3）
  */
-function playBgm(url?: string) {
-  try {
-    if (!bgmHowl) {
-      // 如果BGM未预加载，则动态创建（兜底方案）
-      console.warn('BGM未预加载，动态创建中...')
-      bgmHowl = new Howl({
-        src: [url || '/audio/bgm_main_loop.mp3'],
-        loop: true,
-        volume: bgmTargetVolume,
-        html5: false
-      })
-    }
-    
-    // 确保音量设置正确
-    bgmHowl.volume(bgmTargetVolume)
-    
-    if (!bgmHowl.playing()) {
-      bgmHowl.play()
-    }
-  } catch (e) {
-    console.warn('BGM 播放失败:', e)
-  }
+function playBgm() {
+  // 已移除背景音乐：不执行任何操作
 }
 
-/** 停止 BGM */
 function stopBgm() {
-  try {
-    if (bgmHowl) bgmHowl.stop()
-  } catch {}
+  // 已移除背景音乐：不执行任何操作
 }
 
-/**
- * 渐变 BGM 音量
- * @param v 目标音量（0..1）
- * @param ms 渐变时长（毫秒）
- */
-function fadeBgmTo(v: number, ms = 500) {
-  try {
-    if (bgmHowl) bgmHowl.fade(bgmHowl.volume(), clamp01(v), ms)
-  } catch {}
+function fadeBgmTo() {
+  // 已移除背景音乐：不执行任何操作
 }
+
 
 function getCtx(): AudioContext {
   if (!ctx) ctx = new (window.AudioContext || (window as any).webkitAudioContext)()
@@ -401,4 +321,33 @@ export const sfx = {
   getCacheStatus,
   /** 清除音频缓存 */
   clearAudioCache,
+}
+
+
+// 新增：SFX 辅助方法（缓存并播放）
+function getSfx(key: string, fallbackUrl: string) {
+  let howl = sfxCache[key]
+  if (!howl) {
+    try {
+      howl = new Howl({
+        src: [fallbackUrl],
+        preload: true,
+        volume: sfxVolume * masterVolume,
+        html5: false,
+        pool: 3,
+      })
+      sfxCache[key] = howl
+    } catch {}
+  }
+  try {
+    howl.volume(sfxVolume * masterVolume)
+  } catch {}
+  return howl!
+}
+
+function playSfx(key: string, url: string) {
+  try {
+    const howl = getSfx(key, url)
+    howl.play()
+  } catch {}
 }

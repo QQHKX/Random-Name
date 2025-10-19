@@ -68,11 +68,11 @@ function App() {
   
 
 
-  // 音量与设置联动（SFX + BGM）
+  // 音量与设置联动（仅SFX）
   useEffect(() => {
     sfx.setVolume(settings.sfxVolume)
-    sfx.setBgmVolume(settings.bgmVolume)
-  }, [settings.sfxVolume, settings.bgmVolume])
+    // 移除 BGM 音量联动
+  }, [settings.sfxVolume])
 
   // 应用启动时自动预加载音频（静默预加载，不播放）
   useEffect(() => {
@@ -104,19 +104,18 @@ function App() {
 
 
 
-  // 首次交互时解锁音频并淡入 BGM（只需在一次点击后触发）
+  // 首次交互时仅解锁音频环境（移除BGM）
   useEffect(() => {
     const onFirstUserGesture = async () => {
       window.removeEventListener('pointerdown', onFirstUserGesture)
       try {
-        await sfx.unlock()
-        sfx.playBgm()
-        sfx.fadeBgmTo(settings.bgmVolume, 600)
+        await sfx.unlockAudio()
+        // 不再播放或淡入BGM
       } catch {}
     }
     window.addEventListener('pointerdown', onFirstUserGesture, { once: true })
     return () => window.removeEventListener('pointerdown', onFirstUserGesture)
-  }, [settings.bgmVolume])
+  }, [])
 
   /**
    * 根据速度计算在结果页的停留时间（毫秒）
@@ -162,8 +161,7 @@ function App() {
     // 点击音效
     sfx.click()
 
-    // 滚动阶段：稍微降低 BGM（避免与滴答冲突）
-    sfx.fadeBgmTo(Math.max(0, settings.bgmVolume * 0.6), 300)
+    // 移除：滚动阶段降低/恢复BGM逻辑
 
     // 切换到轮盘页面
     setCurrentPage('roulette')
@@ -174,9 +172,7 @@ function App() {
     const result = drawNext()
     if (!result) {
       setCurrentPage('home')
-      // 恢复 BGM 音量
-      sfx.fadeBgmTo(settings.bgmVolume, 300)
-      // 若在自动连抽中，遇到无可抽取对象则终止
+      // 移除：恢复BGM音量逻辑
       if (isAutoRolling) {
         setIsAutoRolling(false)
       }
@@ -300,8 +296,6 @@ function App() {
   const handleRouletteComplete = () => {
     // 揭晓音效
     if (activeResult) sfx.reveal(activeResult.rarity)
-    // 揭晓后恢复 BGM 音量
-    sfx.fadeBgmTo(settings.bgmVolume, 380)
     // 显示结果覆盖层，不切换页面，轮盘保持在下层
     setShowResultOverlay(true)
 

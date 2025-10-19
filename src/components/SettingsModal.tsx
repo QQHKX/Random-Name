@@ -26,7 +26,6 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
   const [noRepeat, setNoRepeatLocal] = useState(settings.noRepeat)
   const [speed, setSpeedLocal] = useState<Speed>(settings.speed)
   const [volume, setVolumeLocal] = useState(settings.sfxVolume)
-  const [bgmVolume, setBgmVolumeLocal] = useState(settings.bgmVolume)
   
   // 手动修改相关状态
   const [showManualEdit, setShowManualEdit] = useState(false)
@@ -51,8 +50,6 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
       setNoRepeatLocal(settings.noRepeat)
       setSpeedLocal(settings.speed)
       setVolumeLocal(settings.sfxVolume)
-      setBgmVolumeLocal(settings.bgmVolume)
-      // 更新缓存状态
       setCacheStatus(sfx.getCacheStatus())
     }
   }, [open, settings])
@@ -64,8 +61,8 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
     setClassName(className.trim())
     toggleNoRepeat(noRepeat)
     setSpeed(speed)
-    // 同步写回 BGM 与 SFX 音量
-    setVolumes(bgmVolume, volume)
+    // 移除BGM：写回0，仅保留SFX音量
+    setVolumes(0, volume)
     onClose()
   }
 
@@ -353,21 +350,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
           </div>
 
           {/* 音量设置（BGM） */}
-          <div className="mt-3">
-            <div className="flex items-center justify-between mb-1">
-              <div className="text-sm">背景音乐（BGM）</div>
-              <div className="text-xs opacity-60">当前：{Math.round(bgmVolume * 100)}%</div>
-            </div>
-            <input
-              type="range"
-              min={0}
-              max={1}
-              step={0.01}
-              value={bgmVolume}
-              onChange={(e) => setBgmVolumeLocal(parseFloat(e.target.value))}
-              className="w-full"
-            />
-          </div>
+          {/* 已移除背景音乐控制 */}
 
           {/* 名单管理 */}
           <div className="pt-4 border-t border-white/10">
@@ -532,7 +515,7 @@ export default function SettingsModal({ open, onClose }: SettingsModalProps) {
             </div>
             
             <div className="text-xs opacity-60 mt-2">
-              提示：缓存将保持到页面刷新，建议在使用前先缓存以获得最佳体验。包含BGM和所有音效文件。
+              提示：缓存将保持到页面刷新，建议在使用前先缓存以获得最佳体验。仅包含音效文件（已移除背景音乐）。
             </div>
           </div>
 
